@@ -1,7 +1,9 @@
 import { v } from "convex/values";
-import { query, mutation } from "./_generated/server";
+import { query, mutation, action } from "./_generated/server";
 import { getUser } from "./authUtils";
 import { Id } from "./_generated/dataModel";
+import { api } from "./_generated/api";
+import { transformNewsItem } from "./utils/newsHelpers";
 
 // List all news items for the current user
 export const listNewsItems = query({
@@ -343,5 +345,120 @@ export const deleteApiSource = mutation({
     await ctx.db.delete(args.id);
 
     return { success: true };
+  },
+});
+
+// Process news items from API data
+export const processApiNewsItems = mutation({
+  args: {
+    apiSourceId: v.id("newsApiSources"),
+    newsItems: v.array(v.any()),
+    sourceName: v.string()
+  },
+  handler: async (ctx, args) => {
+    const { apiSourceId, newsItems, sourceName } = args;
+    
+    const user = await getUser(ctx);
+    if (!user) {
+      throw new Error("Not authenticated");
+    }
+
+    // Get the API source to verify ownership
+    const apiSource = await ctx.db.get(apiSourceId);
+    if (!apiSource) {
+      throw new Error("API source not found");
+    }
+
+    // Check if user has access to this API source
+    if (apiSource.userId !== user._id) {
+      throw new Error("Unauthorized access to API source");
+    }
+    
+    const savedItems = [];
+    const errors = [];
+    
+    for (const item of newsItems) {
+      try {
+        // Use the helper function to transform the news item
+        const newsData = transformNewsItem(item, sourceName, user._id);
+        
+        // Store the news item
+        const newsId = await ctx.db.insert("news", newsData);
+        savedItems.push(newsId);
+      } catch (error) {
+        console.error("Failed to process news item:", error);
+        errors.push({
+          item: typeof item === 'object' ? JSON.stringify(item).substring(0, 100) + '...' : String(item),
+          error: error instanceof Error ? error.message : String(error)
+        });
+        // Continue with next item instead of failing the entire batch
+      }
+    }
+    
+    // Update the last refreshed timestamp
+    await ctx.db.patch(apiSourceId, {
+      lastRefreshed: Date.now(),
+      updatedAt: Date.now(),
+    });
+    
+    return { 
+      success: true, 
+      itemsImported: savedItems.length,
+      errors: errors.length > 0 ? errors : undefined
+    };
+  },
+});
+
+// Manually trigger an API fetch from a specific source
+export const triggerApiSource = action({
+  args: { id: v.id("newsApiSources") },
+  handler: async (ctx, args): Promise<{ success: boolean; itemsImported: number }> => {
+    // Get the API source using the internal helper function
+    const apiSource: {
+      _id: Id<"newsApiSources">;
+      name: string;
+      url: string;
+      apiKey?: string;
+      headers?: Record<string, string>;
+      userId: Id<"users">;
+    } = await ctx.runQuery(api.news.getApiSource, { id: args.id });
+    
+    try {
+      // Prepare headers
+      const headers: Record<string, string> = {
+        ...(apiSource.headers || {}),
+        ...(apiSource.apiKey ? { "Authorization": `Bearer ${apiSource.apiKey}` } : {})
+      };
+
+      // Make the API request
+      const response: Response = await fetch(apiSource.url, { headers });
+      
+      if (!response.ok) {
+        throw new Error(`API returned status ${response.status}`);
+      }
+      
+      const data: any = await response.json();
+      
+      // Process and store the news items
+      // Note: This implementation assumes a specific API response format
+      // Real implementation would need to handle different API formats
+      const newsItems: any[] = Array.isArray(data) ? data : (data.articles || data.items || data.results || []);
+      
+      // Use the mutation to process the news items
+      const result: { success: boolean; itemsImported: number } = await ctx.runMutation(api.news.processApiNewsItems, {
+        apiSourceId: args.id,
+        newsItems,
+        sourceName: apiSource.name
+      });
+      
+      return result;
+    } catch (error) {
+      // Fix error handling for unknown type
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : String(error);
+        
+      throw new Error(`Failed to fetch from API: ${errorMessage}`);
+    }
   },
 }); 

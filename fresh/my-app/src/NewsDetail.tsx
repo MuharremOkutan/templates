@@ -10,8 +10,7 @@ export default function NewsDetail() {
   
   // This will be replaced with the actual API call to get the news item
   // For now, let's just find the item in our mock data
-  const newsItem = useQuery(api.news?.getNewsItem, newsId ? { id: newsId } : "skip") || 
-    mockNewsItems.find(item => item.id === newsId);
+  const newsItem = useQuery(api.news?.getNewsItem, newsId ? { id: newsId } : "skip");
 
   if (!newsItem) {
     return (
@@ -21,6 +20,10 @@ export default function NewsDetail() {
       </div>
     );
   }
+
+  // Extract dynamic fields and organize them by category
+  const dynamicFields = newsItem.dynamicFields || {};
+  const fieldCategories = categorizeFields(dynamicFields);
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -77,6 +80,29 @@ export default function NewsDetail() {
           </div>
         </div>
         
+        {/* Dynamic Fields */}
+        {Object.keys(fieldCategories).length > 0 && (
+          <div className="mb-6">
+            <h3 className="text-xl font-medium mb-4 text-primary-light">Additional Information</h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {Object.entries(fieldCategories).map(([category, fields]) => (
+                <div key={category} className="glass-card p-4">
+                  <h4 className="text-lg font-medium mb-3 text-white">{category}</h4>
+                  <div className="space-y-2">
+                    {Object.entries(fields).map(([field, value]) => (
+                      <div key={field} className="grid grid-cols-3 gap-2 text-sm">
+                        <div className="text-gray-400">{formatFieldName(field)}</div>
+                        <div className="text-white col-span-2">{formatFieldValue(value)}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        
         {/* Entities and Business Contexts */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Entities */}
@@ -118,12 +144,12 @@ export default function NewsDetail() {
           </div>
         </div>
         
-        {/* API Response */}
+        {/* Raw API Response */}
         <div className="mt-8">
-          <h3 className="text-lg font-medium mb-3 text-primary-light">API Response</h3>
+          <h3 className="text-lg font-medium mb-3 text-primary-light">Raw API Response</h3>
           <div className="bg-slate-900/70 p-4 rounded-lg border border-slate-700 overflow-x-auto">
             <pre className="text-xs text-gray-300">
-              {JSON.stringify(newsItem, null, 2)}
+              {newsItem.apiResponse}
             </pre>
           </div>
         </div>
@@ -134,14 +160,124 @@ export default function NewsDetail() {
 
 // Helper function to format dates
 function formatDate(dateString) {
-  const date = new Date(dateString);
-  return new Intl.DateTimeFormat('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date);
+  if (!dateString) return "Unknown date";
+  
+  try {
+    const date = new Date(dateString);
+    return new Intl.DateTimeFormat('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(date);
+  } catch (e) {
+    return "Invalid date";
+  }
+}
+
+// Helper function to format field names
+function formatFieldName(key) {
+  if (!key) return '';
+  
+  // Convert camelCase or snake_case to Title Case
+  return key
+    .replace(/([A-Z])/g, ' $1') // Insert a space before all caps
+    .replace(/_/g, ' ') // Replace underscores with spaces
+    .replace(/^\w/, c => c.toUpperCase()) // Capitalize the first letter
+    .trim();
+}
+
+// Helper function to format field values
+function formatFieldValue(value) {
+  if (value === null || value === undefined) return '-';
+  
+  // Handle different types of values
+  if (typeof value === 'boolean') {
+    return value ? 'Yes' : 'No';
+  }
+  
+  if (typeof value === 'number') {
+    // Format numbers with commas for thousands
+    return new Intl.NumberFormat().format(value);
+  }
+  
+  if (typeof value === 'object') {
+    if (value instanceof Date) {
+      return formatDate(value);
+    }
+    
+    // For arrays, join with commas
+    if (Array.isArray(value)) {
+      if (value.length === 0) return '-';
+      return value.join(', ');
+    }
+    
+    // For objects, return a summary
+    return JSON.stringify(value, null, 2);
+  }
+  
+  // For strings, return as is (no truncation in detail view)
+  return String(value);
+}
+
+// Helper function to categorize fields
+function categorizeFields(fields) {
+  const categories = {
+    'Source Information': {},
+    'Content Details': {},
+    'Metadata': {},
+    'Analytics': {},
+    'Other': {}
+  };
+  
+  // Source-related fields
+  const sourceFields = ['author', 'authorName', 'publisher', 'publication', 'source', 'sourceName', 'sourceUrl'];
+  
+  // Content-related fields
+  const contentFields = ['language', 'lang', 'country', 'region', 'category', 'type', 'format'];
+  
+  // Metadata fields
+  const metadataFields = ['publishedAt', 'createdAt', 'updatedAt', 'timestamp', 'date', 'expiresAt'];
+  
+  // Analytics fields
+  const analyticsFields = ['sentiment', 'relevance', 'score', 'rating', 'popularity', 'views', 'shares'];
+  
+  for (const [key, value] of Object.entries(fields)) {
+    // Skip null/undefined values
+    if (value === null || value === undefined) continue;
+    
+    // Skip fields with long arrays or objects
+    if (Array.isArray(value) && value.length > 20) continue;
+    if (typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length > 10) continue;
+    
+    // Skip URL fields to avoid cluttering the UI
+    if (key.toLowerCase().includes('url') || 
+        key.toLowerCase().includes('link') || 
+        key.toLowerCase().includes('href')) continue;
+    
+    // Categorize the field
+    if (sourceFields.some(f => key.toLowerCase().includes(f.toLowerCase()))) {
+      categories['Source Information'][key] = value;
+    } else if (contentFields.some(f => key.toLowerCase().includes(f.toLowerCase()))) {
+      categories['Content Details'][key] = value;
+    } else if (metadataFields.some(f => key.toLowerCase().includes(f.toLowerCase()))) {
+      categories['Metadata'][key] = value;
+    } else if (analyticsFields.some(f => key.toLowerCase().includes(f.toLowerCase()))) {
+      categories['Analytics'][key] = value;
+    } else {
+      categories['Other'][key] = value;
+    }
+  }
+  
+  // Remove empty categories
+  for (const category in categories) {
+    if (Object.keys(categories[category]).length === 0) {
+      delete categories[category];
+    }
+  }
+  
+  return categories;
 }
 
 // Using the same mock data as in News.tsx for development

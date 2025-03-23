@@ -77,6 +77,7 @@ export default defineSchema({
     businessContexts: v.array(v.string()),
     fullContent: v.optional(v.string()),
     apiResponse: v.optional(v.string()), // Store the full API response as JSON string
+    dynamicFields: v.optional(v.any()), // Store any additional fields from the API as JSON
     userId: v.id("users"),
     createdAt: v.number(),
     updatedAt: v.number(),

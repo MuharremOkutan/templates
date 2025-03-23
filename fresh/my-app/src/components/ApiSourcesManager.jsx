@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useMutation, useQuery } from "convex/react";
+import { useMutation, useQuery, useAction } from "convex/react";
 import { api } from "../../convex/_generated/api";
 
 const DAYS_OF_WEEK = [
@@ -17,6 +17,8 @@ export default function ApiSourcesManager() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editingSource, setEditingSource] = useState(null);
+  const [loadingSourceId, setLoadingSourceId] = useState(null);
+  const [triggerResult, setTriggerResult] = useState(null);
   
   // Form state
   const [form, setForm] = useState({
@@ -34,6 +36,7 @@ export default function ApiSourcesManager() {
   const createApiSource = useMutation(api.news.createApiSource);
   const updateApiSource = useMutation(api.news.updateApiSource);
   const deleteApiSource = useMutation(api.news.deleteApiSource);
+  const triggerApiSource = useAction(api.fetchNews.triggerNewsApiAndProcess);
 
   // Reset form for new source
   const openNewSourceModal = () => {
@@ -146,6 +149,66 @@ export default function ApiSourcesManager() {
     }
   };
 
+  // Trigger API fetch - improved error handling
+  const handleTriggerApi = async (sourceId) => {
+    try {
+      setLoadingSourceId(sourceId);
+      setTriggerResult(null);
+      
+      // Call our reliable action
+      const result = await triggerApiSource({ id: sourceId });
+      
+      // Even if we get a result, check if there are errors
+      if (!result.success || (result.errors && result.errors.length > 0)) {
+        // API request failed or had errors
+        const errorMessage = result.errors && result.errors.length > 0
+          ? result.errors[0].message
+          : "Failed to fetch news from API";
+        
+        setTriggerResult({
+          sourceId,
+          success: false,
+          message: `Error: ${errorMessage}`,
+        });
+      } else {
+        // Show success notification
+        setTriggerResult({
+          sourceId,
+          success: true,
+          message: `Successfully imported ${result.itemsImported} news items`,
+        });
+      }
+      
+      // Clear notification after 5 seconds
+      setTimeout(() => {
+        setTriggerResult(prev => prev?.sourceId === sourceId ? null : prev);
+      }, 5000);
+    } catch (error) {
+      console.error("API fetch error:", error);
+      
+      // Extract the actual error message from the error object
+      let errorMessage = "Failed to fetch from API";
+      if (error instanceof Error) {
+        // Try to extract the inner error message if available
+        const match = error.message.match(/Failed to fetch from API: (.*)/);
+        errorMessage = match ? match[1] : error.message;
+      }
+      
+      setTriggerResult({
+        sourceId,
+        success: false,
+        message: `Error: ${errorMessage}`,
+      });
+      
+      // Clear notification after 5 seconds
+      setTimeout(() => {
+        setTriggerResult(prev => prev?.sourceId === sourceId ? null : prev);
+      }, 5000);
+    } finally {
+      setLoadingSourceId(null);
+    }
+  };
+
   return (
     <div className="space-y-6 mb-8">
       <div className="flex justify-between items-center">
@@ -189,6 +252,29 @@ export default function ApiSourcesManager() {
                 </div>
                 <div className="flex gap-2">
                   <button
+                    onClick={() => handleTriggerApi(source._id)}
+                    disabled={loadingSourceId === source._id}
+                    className={`${
+                      loadingSourceId === source._id
+                        ? "bg-primary/50 cursor-not-allowed"
+                        : "bg-primary hover:bg-primary-dark"
+                    } text-white px-3 py-1 rounded flex items-center gap-1`}
+                  >
+                    {loadingSourceId === source._id ? (
+                      <>
+                        <span className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-1"></span>
+                        Fetching...
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        Trigger Now
+                      </>
+                    )}
+                  </button>
+                  <button
                     onClick={() => openEditSourceModal(source)}
                     className="bg-slate-700 hover:bg-slate-600 text-white px-3 py-1 rounded"
                   >
@@ -203,6 +289,19 @@ export default function ApiSourcesManager() {
                 </div>
               </div>
 
+              {/* Display trigger result notification */}
+              {triggerResult && triggerResult.sourceId === source._id && (
+                <div 
+                  className={`mt-2 p-2 rounded-md text-sm ${
+                    triggerResult.success 
+                      ? "bg-green-500/20 border border-green-500/50 text-green-400" 
+                      : "bg-red-500/20 border border-red-500/50 text-red-400"
+                  }`}
+                >
+                  {triggerResult.message}
+                </div>
+              )}
+
               <div className="mt-4 border-t border-slate-700 pt-4">
                 <h4 className="text-sm text-gray-400 mb-2">Refresh Schedule</h4>
                 <div className="text-sm text-gray-300">
@@ -216,6 +315,11 @@ export default function ApiSourcesManager() {
                     Time: {source.refreshHour.toString().padStart(2, "0")}:
                     {source.refreshMinute.toString().padStart(2, "0")}
                   </p>
+                  {source.lastRefreshed && (
+                    <p className="mt-1 text-xs text-gray-400">
+                      Last refreshed: {new Date(source.lastRefreshed).toLocaleString()}
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
