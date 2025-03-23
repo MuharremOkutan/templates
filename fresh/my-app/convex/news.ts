@@ -3,7 +3,7 @@ import { query, mutation, action } from "./_generated/server";
 import { getUser } from "./authUtils";
 import { Id } from "./_generated/dataModel";
 import { api } from "./_generated/api";
-import { transformNewsItem } from "./utils/newsHelpers";
+import { transformNewsItem, safeStringify, NewsItem } from "./utils/newsHelpers";
 
 // List all news items for the current user
 export const listNewsItems = query({
@@ -270,54 +270,60 @@ export const updateApiSource = mutation({
     url: v.optional(v.string()),
     apiKey: v.optional(v.string()),
     headers: v.optional(v.any()),
-    active: v.optional(v.boolean()),
-    refreshWeekdays: v.optional(v.array(v.number())),
     refreshHour: v.optional(v.number()),
     refreshMinute: v.optional(v.number()),
+    refreshWeekdays: v.optional(v.array(v.number())),
+    isActive: v.optional(v.boolean()),
+    lastRefreshed: v.optional(v.number()),
+    lastTriggered: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const { id, ...updates } = args;
-
     const user = await getUser(ctx);
     if (!user) {
-      throw new Error("Not authenticated");
+      throw new Error("Unauthorized");
     }
-
-    // Get the existing API source
-    const apiSource = await ctx.db.get(id);
-    if (!apiSource) {
-      throw new Error("API source not found");
+    
+    // Get the API source
+    const apiSource = await ctx.db.get(args.id);
+    if (!apiSource || apiSource.userId !== user._id) {
+      throw new Error("API Source not found or unauthorized");
     }
-
-    // Check if user has access to this API source
-    if (apiSource.userId !== user._id) {
-      throw new Error("Unauthorized access to API source");
-    }
-
-    // Validate input if provided
-    if (updates.refreshHour !== undefined && (updates.refreshHour < 0 || updates.refreshHour > 23)) {
+    
+    // Validate input
+    if (args.refreshHour !== undefined && (args.refreshHour < 0 || args.refreshHour > 23)) {
       throw new Error("Refresh hour must be between 0 and 23");
     }
     
-    if (updates.refreshMinute !== undefined && (updates.refreshMinute < 0 || updates.refreshMinute > 59)) {
+    if (args.refreshMinute !== undefined && (args.refreshMinute < 0 || args.refreshMinute > 59)) {
       throw new Error("Refresh minute must be between 0 and 59");
     }
     
-    if (updates.refreshWeekdays) {
-      for (const weekday of updates.refreshWeekdays) {
-        if (weekday < 0 || weekday > 6) {
-          throw new Error("Weekdays must be between 0 (Sunday) and 6 (Saturday)");
+    if (args.refreshWeekdays !== undefined) {
+      for (const day of args.refreshWeekdays) {
+        if (day < 0 || day > 6) {
+          throw new Error("Refresh weekdays must be between 0 and 6");
         }
       }
     }
-
+    
+    // Remove undefined fields
+    const updateData: Record<string, any> = {};
+    for (const [key, value] of Object.entries(args)) {
+      if (key !== 'id' && value !== undefined) {
+        updateData[key] = value;
+      }
+    }
+    
+    // Always add updated timestamp
+    updateData.updatedAt = Date.now();
+    
     // Update the API source
-    await ctx.db.patch(id, {
-      ...updates,
-      updatedAt: Date.now(),
-    });
-
-    return { success: true };
+    const updatedId = await ctx.db.patch(args.id, updateData);
+    
+    return { 
+      id: updatedId,
+      success: true 
+    };
   },
 });
 
@@ -353,112 +359,197 @@ export const processApiNewsItems = mutation({
   args: {
     apiSourceId: v.id("newsApiSources"),
     newsItems: v.array(v.any()),
-    sourceName: v.string()
   },
-  handler: async (ctx, args) => {
-    const { apiSourceId, newsItems, sourceName } = args;
-    
+  handler: async (ctx, args): Promise<{
+    savedCount: number;
+    errors: string[];
+    savedItems: Id<"news">[];
+  }> => {
     const user = await getUser(ctx);
     if (!user) {
-      throw new Error("Not authenticated");
+      throw new Error("Unauthorized");
     }
 
-    // Get the API source to verify ownership
+    const { apiSourceId, newsItems } = args;
+
+    // Get the API source to check ownership and get details
     const apiSource = await ctx.db.get(apiSourceId);
-    if (!apiSource) {
-      throw new Error("API source not found");
+    if (!apiSource || apiSource.userId !== user._id) {
+      throw new Error("API Source not found or unauthorized");
     }
 
-    // Check if user has access to this API source
-    if (apiSource.userId !== user._id) {
-      throw new Error("Unauthorized access to API source");
-    }
-    
-    const savedItems = [];
-    const errors = [];
-    
+    console.log(`Processing ${newsItems.length} news items from API source ${apiSource.name}`);
+    const savedItems: Id<"news">[] = [];
+    const errors: string[] = [];
+
+    // Process each news item individually so one failure doesn't break all
     for (const item of newsItems) {
       try {
-        // Use the helper function to transform the news item
-        const newsData = transformNewsItem(item, sourceName, user._id);
+        // Transform the item with our improved helper
+        const transformedItem = transformNewsItem(item, apiSourceId);
         
-        // Store the news item
-        const newsId = await ctx.db.insert("news", newsData);
+        if (!transformedItem) {
+          errors.push(`Failed to transform item: ${safeStringify(item).substring(0, 100)}`);
+          continue;
+        }
+        
+        // Check if this article already exists (by article_id or title)
+        const existingItems = await ctx.db
+          .query("news")
+          .filter((q) => {
+            if (transformedItem.article_id) {
+              return q.and(
+                q.eq(q.field("userId"), user._id),
+                q.eq(q.field("_creationTime"), q.field("_creationTime")), // Dummy condition to work around the field issue
+                q.eq(q.field("article_id"), transformedItem.article_id)
+              );
+            }
+            return q.and(
+              q.eq(q.field("userId"), user._id),
+              q.eq(q.field("_creationTime"), q.field("_creationTime")), // Dummy condition to work around the field issue
+              q.eq(q.field("title"), transformedItem.title)
+            );
+          })
+          .collect();
+        
+        if (existingItems.length > 0) {
+          console.log(`Item already exists: ${transformedItem.title}`);
+          continue;
+        }
+
+        // Adapt the transformed item to match the news table schema
+        const newsItemToInsert = {
+          title: transformedItem.title,
+          summary: transformedItem.content, // Use content as summary
+          source: transformedItem.source.name,
+          publishDate: transformedItem.publishedAt,
+          industry: transformedItem.categories.length > 0 ? transformedItem.categories[0] : "General",
+          entities: Array.isArray(transformedItem.entities) ? 
+            transformedItem.entities.map(e => typeof e === 'string' ? e : JSON.stringify(e)) : [],
+          businessContexts: Array.isArray(transformedItem.businessContexts) ?
+            transformedItem.businessContexts.map(e => typeof e === 'string' ? e : JSON.stringify(e)) : [],
+          fullContent: transformedItem.content,
+          apiResponse: safeStringify(item),
+          
+          // Additional fields
+          article_id: transformedItem.article_id,
+          link: transformedItem.link,
+          keywords: transformedItem.keywords,
+          creator: transformedItem.creator ? [transformedItem.creator] : [],
+          image_url: transformedItem.image_url,
+          language: transformedItem.language,
+          category: transformedItem.categories,
+          country: transformedItem.country ? [transformedItem.country] : [],
+          sentiment: transformedItem.sentiment ? JSON.stringify(transformedItem.sentiment) : undefined,
+          
+          // Required fields
+          userId: user._id,
+          createdAt: Date.now(),
+          updatedAt: Date.now()
+        };
+
+        // Save the news item
+        const newsId = await ctx.db.insert("news", newsItemToInsert);
+        
+        console.log(`Saved news item: ${transformedItem.title}`);
         savedItems.push(newsId);
       } catch (error) {
-        console.error("Failed to process news item:", error);
-        errors.push({
-          item: typeof item === 'object' ? JSON.stringify(item).substring(0, 100) + '...' : String(item),
-          error: error instanceof Error ? error.message : String(error)
-        });
-        // Continue with next item instead of failing the entire batch
+        console.error(`Error processing news item:`, error);
+        errors.push(error instanceof Error ? error.message : String(error));
       }
     }
-    
-    // Update the last refreshed timestamp
-    await ctx.db.patch(apiSourceId, {
-      lastRefreshed: Date.now(),
-      updatedAt: Date.now(),
-    });
-    
-    return { 
-      success: true, 
-      itemsImported: savedItems.length,
-      errors: errors.length > 0 ? errors : undefined
+
+    console.log(`Successfully processed ${savedItems.length} news items with ${errors.length} errors`);
+    return {
+      savedCount: savedItems.length,
+      errors,
+      savedItems,
     };
   },
 });
 
 // Manually trigger an API fetch from a specific source
 export const triggerApiSource = action({
-  args: { id: v.id("newsApiSources") },
-  handler: async (ctx, args): Promise<{ success: boolean; itemsImported: number }> => {
-    // Get the API source using the internal helper function
-    const apiSource: {
-      _id: Id<"newsApiSources">;
-      name: string;
-      url: string;
-      apiKey?: string;
-      headers?: Record<string, string>;
-      userId: Id<"users">;
-    } = await ctx.runQuery(api.news.getApiSource, { id: args.id });
+  args: {
+    id: v.id("newsApiSources"),
+    debug: v.optional(v.boolean())
+  },
+  handler: async (ctx, args): Promise<{
+    success: boolean;
+    message?: string;
+    itemsProcessed?: number;
+    error?: string;
+    debug?: any;
+  }> => {
+    const debug = args.debug ?? false;
+    
+    // Actions can't use getUser - use getUserIdentity directly
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Unauthorized");
+    }
+
+    // Get the API source
+    const apiSource = await ctx.runQuery(api.news.getApiSource, { id: args.id });
+    if (!apiSource) {
+      throw new Error("API Source not found");
+    }
+    
+    // The getApiSource function already checks authorization
+
+    console.log(`Triggering API source: ${apiSource.name} (${args.id})`);
     
     try {
-      // Prepare headers
-      const headers: Record<string, string> = {
-        ...(apiSource.headers || {}),
-        ...(apiSource.apiKey ? { "Authorization": `Bearer ${apiSource.apiKey}` } : {})
-      };
-
-      // Make the API request
-      const response: Response = await fetch(apiSource.url, { headers });
-      
-      if (!response.ok) {
-        throw new Error(`API returned status ${response.status}`);
-      }
-      
-      const data: any = await response.json();
-      
-      // Process and store the news items
-      // Note: This implementation assumes a specific API response format
-      // Real implementation would need to handle different API formats
-      const newsItems: any[] = Array.isArray(data) ? data : (data.articles || data.items || data.results || []);
-      
-      // Use the mutation to process the news items
-      const result: { success: boolean; itemsImported: number } = await ctx.runMutation(api.news.processApiNewsItems, {
+      // Use our improved action to trigger the API and process the results
+      const result = await ctx.runAction(api.fetchNews.triggerNewsApiAndProcess, {
         apiSourceId: args.id,
-        newsItems,
-        sourceName: apiSource.name
+        debug
+      });
+      
+      // Always update the last triggered timestamp regardless of success
+      await ctx.runMutation(api.news.updateApiSource, {
+        id: args.id,
+        lastTriggered: Date.now()
       });
       
       return result;
     } catch (error) {
-      // Fix error handling for unknown type
+      console.error(`Error triggering API source ${apiSource.name}:`, error);
+      
+      // Still update the last triggered timestamp
+      await ctx.runMutation(api.news.updateApiSource, {
+        id: args.id,
+        lastTriggered: Date.now()
+      });
+      
       const errorMessage = error instanceof Error 
         ? error.message 
         : String(error);
         
-      throw new Error(`Failed to fetch from API: ${errorMessage}`);
+      return {
+        success: false,
+        message: `Failed to trigger API source: ${errorMessage}`,
+        error: errorMessage
+      };
     }
+  }
+});
+
+// Get all news items for the current user
+// This is the function that was missing and causing the error
+export const getNews = query({
+  handler: async (ctx) => {
+    const user = await getUser(ctx);
+    if (!user) {
+      return [];
+    }
+
+    const newsItems = await ctx.db
+      .query("news")
+      .withIndex("by_publish_date", (q) => q.eq("userId", user._id))
+      .order("desc")  // Sort by publishDate in descending order (newest first)
+      .collect();
+
+    return newsItems;
   },
-}); 
+});

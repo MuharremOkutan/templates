@@ -12,7 +12,7 @@ const DAYS_OF_WEEK = [
   { value: 6, label: "Saturday" },
 ];
 
-export default function ApiSourcesManager() {
+export function ApiSourcesManager() {
   const apiSources = useQuery(api.news.listApiSources) || [];
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -156,7 +156,7 @@ export default function ApiSourcesManager() {
       setTriggerResult(null);
       
       // Call our reliable action
-      const result = await triggerApiSource({ id: sourceId });
+      const result = await triggerApiSource({ apiSourceId: sourceId });
       
       // Even if we get a result, check if there are errors
       if (!result.success || (result.errors && result.errors.length > 0)) {
@@ -486,4 +486,6 @@ export default function ApiSourcesManager() {
       )}
     </div>
   );
-} 
+}
+
+export default ApiSourcesManager; 

@@ -38,6 +38,19 @@ export default defineSchema({
     userId: v.id("users"),
     createdAt: v.number(), // timestamp
   }).index("by_user", ["userId"]),
+  promptCollections: defineTable({
+    title: v.string(),
+    description: v.string(),
+    prompts: v.array(
+      v.object({
+        text: v.string(),
+        description: v.optional(v.string()),
+      })
+    ),
+    userId: v.id("users"),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_user", ["userId"]),
   collections: defineTable({
     name: v.string(),
     description: v.optional(v.string()),
@@ -67,6 +80,21 @@ export default defineSchema({
     createdAt: v.number(),
     updatedAt: v.number(),
   }).index("by_user", ["userId"]),
+  explorationJobs: defineTable({
+    name: v.string(),
+    description: v.string(),
+    businessContextId: v.optional(v.id("businessContexts")),
+    collectionId: v.optional(v.id("collections")),
+    startDate: v.optional(v.string()), // ISO date string
+    endDate: v.optional(v.string()), // ISO date string
+    scheduleDays: v.array(v.number()), // 0-6 (Sunday-Saturday)
+    scheduleHours: v.array(v.number()), // 0-23
+    lastRun: v.optional(v.number()), // timestamp
+    status: v.optional(v.string()), // "pending", "running", "completed", "failed"
+    userId: v.id("users"),
+    createdAt: v.number(),
+    updatedAt: v.optional(v.number()),
+  }).index("by_user", ["userId"]),
   news: defineTable({
     title: v.string(),
     summary: v.string(),
@@ -77,7 +105,33 @@ export default defineSchema({
     businessContexts: v.array(v.string()),
     fullContent: v.optional(v.string()),
     apiResponse: v.optional(v.string()), // Store the full API response as JSON string
-    dynamicFields: v.optional(v.any()), // Store any additional fields from the API as JSON
+    
+    // Additional detailed fields from the API response
+    article_id: v.optional(v.string()),
+    link: v.optional(v.string()),
+    keywords: v.optional(v.array(v.string())),
+    creator: v.optional(v.array(v.string())),
+    video_url: v.optional(v.string()),
+    image_url: v.optional(v.string()),
+    pubDateTZ: v.optional(v.string()),
+    source_id: v.optional(v.string()),
+    source_priority: v.optional(v.number()),
+    source_name: v.optional(v.string()),
+    source_url: v.optional(v.string()),
+    source_icon: v.optional(v.string()),
+    language: v.optional(v.string()),
+    country: v.optional(v.array(v.string())),
+    category: v.optional(v.array(v.string())),
+    ai_tag: v.optional(v.string()),
+    sentiment: v.optional(v.string()),
+    sentiment_stats: v.optional(v.string()),
+    ai_region: v.optional(v.string()),
+    ai_org: v.optional(v.string()),
+    duplicate: v.optional(v.boolean()),
+    
+    // Preserve any additional dynamic fields
+    dynamicFields: v.optional(v.any()), 
+    
     userId: v.id("users"),
     createdAt: v.number(),
     updatedAt: v.number(),

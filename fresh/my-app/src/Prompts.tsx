@@ -155,8 +155,8 @@ export default function Prompts() {
 
   return (
     <div className="w-full max-w-6xl mx-auto px-4">
-      <div className="flex flex-col gap-6 py-6">
-        <p className="text-gray-300">Welcome, <span className="text-primary">{viewer ?? "User"}</span>! Manage your prompts and collections here.</p>
+      <div className="flex flex-col gap-6 py-6 relative">
+        <p className="text-gray-300">Welcome, <span className="gradient-text">{viewer ?? "User"}</span>! Manage your prompts and collections here.</p>
         
         {/* Search and actions */}
         <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
@@ -166,7 +166,7 @@ export default function Prompts() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search prompts or collections..."
-              className="w-full bg-slate-800/50 backdrop-blur-sm text-white border border-slate-700 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary pl-10"
+              className="input-primary pl-10"
             />
             <span className="absolute left-3 top-2.5 text-gray-400">
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -208,24 +208,34 @@ export default function Prompts() {
         {/* Tabs */}
         <div className="glass-card inline-flex p-1 rounded-lg self-start">
           <button
-            className={`py-2 px-4 rounded-md transition-colors ${
+            className={`py-2 px-4 rounded-md transition-all duration-300 ${
               activeTab === "prompts" 
                 ? "bg-primary text-white" 
                 : "text-gray-300 hover:text-white hover:bg-slate-800/50"
             }`}
             onClick={() => setActiveTab("prompts")}
           >
-            All Prompts
+            <span className="flex items-center">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1.5">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+              </svg>
+              All Prompts
+            </span>
           </button>
           <button
-            className={`py-2 px-4 rounded-md transition-colors ${
+            className={`py-2 px-4 rounded-md transition-all duration-300 ${
               activeTab === "collections" 
                 ? "bg-primary text-white" 
                 : "text-gray-300 hover:text-white hover:bg-slate-800/50"
             }`}
             onClick={() => setActiveTab("collections")}
           >
-            Collections
+            <span className="flex items-center">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1.5">
+                <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"></path>
+              </svg>
+              Collections
+            </span>
           </button>
         </div>
         
@@ -303,7 +313,7 @@ export default function Prompts() {
         )}
         
         {activeTab === "prompts" && filteredPrompts.length === 0 && (
-          <div className="glass-card p-8 text-center">
+          <div className="glass-card gradient-border p-8 text-center">
             <p className="text-gray-300 mb-4">
               {searchQuery ? "No prompts match your search." : "You don't have any prompts yet."}
             </p>
@@ -319,7 +329,7 @@ export default function Prompts() {
         )}
         
         {activeTab === "collections" && filteredCollections.length === 0 && (
-          <div className="glass-card p-8 text-center">
+          <div className="glass-card gradient-border p-8 text-center">
             <p className="text-gray-300 mb-4">
               {searchQuery ? "No collections match your search." : "You don't have any collections yet."}
             </p>
@@ -337,7 +347,7 @@ export default function Prompts() {
       
       {/* Add AI Test Modal */}
       {testingPrompt && (
-        <div className="fixed inset-0 bg-black bg-opacity-70 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-xl flex items-center justify-center z-50 p-4 overflow-y-auto">
           <div className="relative w-full max-w-4xl">
             <AITester 
               initialPrompt={testingPrompt.content}
@@ -349,7 +359,7 @@ export default function Prompts() {
       
       {/* Create/Edit Prompt Modal */}
       {(isCreatingPrompt || activePrompt) && (
-        <div className="fixed inset-0 bg-black bg-opacity-70 backdrop-blur-sm flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-xl flex items-center justify-center z-50 p-4 overflow-y-auto">
           <div className="max-w-2xl w-full">
             <PromptForm
               content={activePrompt?.content}
@@ -366,7 +376,7 @@ export default function Prompts() {
       
       {/* Create/Edit Collection Modal */}
       {(isCreatingCollection || activeCollection) && (
-        <div className="fixed inset-0 bg-black bg-opacity-70 backdrop-blur-sm flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-xl flex items-center justify-center z-50 p-4 overflow-y-auto">
           <div className="glass-card gradient-border p-6 max-w-md w-full">
             <h2 className="text-xl font-medium mb-4 gradient-text">
               {activeCollection ? "Edit Collection" : "Create New Collection"}
@@ -421,15 +431,15 @@ function PromptForm({ content = '', example = '', onSubmit, onCancel }: PromptFo
   };
 
   return (
-    <div className="glass-card p-6 w-full max-w-2xl">
-      <h3 className="text-lg font-medium mb-4 gradient-text">
+    <div className="glass-card gradient-border p-6 w-full max-w-2xl">
+      <h3 className="text-lg font-medium mb-6 gradient-text">
         {content ? 'Edit Prompt' : 'Create New Prompt'}
       </h3>
       
       {!isTestingMode ? (
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-5">
           <div>
-            <label htmlFor="content" className="block text-sm font-medium text-gray-300 mb-1">
+            <label htmlFor="content" className="block text-sm font-medium text-gray-300 mb-2">
               Prompt Content
             </label>
             <textarea
@@ -437,7 +447,7 @@ function PromptForm({ content = '', example = '', onSubmit, onCancel }: PromptFo
               value={promptContent}
               onChange={(e) => setPromptContent(e.target.value)}
               rows={6}
-              className="w-full bg-slate-800/50 backdrop-blur-sm text-white border border-slate-700 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary"
+              className="input-primary"
               placeholder="Enter your prompt content..."
               required
             />
@@ -445,14 +455,14 @@ function PromptForm({ content = '', example = '', onSubmit, onCancel }: PromptFo
           
           {testResponse ? (
             <div>
-              <div className="flex justify-between items-center mb-1">
+              <div className="flex justify-between items-center mb-2">
                 <label htmlFor="example" className="block text-sm font-medium text-gray-300">
                   Test Result (will be saved as example)
                 </label>
                 <button
                   type="button"
                   onClick={() => setTestResponse(null)}
-                  className="text-xs text-primary hover:text-primary-light"
+                  className="text-xs text-primary hover:text-primary-light transition-colors"
                 >
                   Clear
                 </button>
@@ -463,7 +473,7 @@ function PromptForm({ content = '', example = '', onSubmit, onCancel }: PromptFo
             </div>
           ) : (
             <div>
-              <label htmlFor="example" className="block text-sm font-medium text-gray-300 mb-1">
+              <label htmlFor="example" className="block text-sm font-medium text-gray-300 mb-2">
                 Example Output
               </label>
               <textarea
@@ -471,7 +481,7 @@ function PromptForm({ content = '', example = '', onSubmit, onCancel }: PromptFo
                 value={promptExample}
                 onChange={(e) => setPromptExample(e.target.value)}
                 rows={6}
-                className="w-full bg-slate-800/50 backdrop-blur-sm text-white border border-slate-700 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary"
+                className="input-primary"
                 placeholder="Enter an example output from this prompt..."
                 required
               />
@@ -510,11 +520,11 @@ function PromptForm({ content = '', example = '', onSubmit, onCancel }: PromptFo
       ) : (
         <div className="space-y-6">
           <div>
-            <div className="flex justify-between items-center mb-2">
-              <h4 className="text-md font-medium text-white">Test Your Prompt</h4>
+            <div className="flex justify-between items-center mb-3">
+              <h4 className="text-md font-medium gradient-text">Test Your Prompt</h4>
               <button
                 onClick={() => setIsTestingMode(false)}
-                className="text-sm text-gray-400 hover:text-white"
+                className="text-sm text-gray-400 hover:text-white transition-colors px-3 py-1 rounded-md hover:bg-slate-700/50"
               >
                 Back to Edit
               </button>
@@ -575,99 +585,94 @@ function CollectionForm({
   );
 
   return (
-    <form onSubmit={handleSubmit} className="glass-card p-6">
-      <h3 className="text-lg font-medium mb-4 gradient-text">
-        {name ? 'Edit Collection' : 'Create New Collection'}
-      </h3>
-      <div className="space-y-4">
-        <div>
-          <label htmlFor="name" className="block text-sm font-medium text-gray-300 mb-1">
-            Name
-          </label>
-          <input
-            type="text"
-            id="name"
-            value={collectionName}
-            onChange={(e) => setCollectionName(e.target.value)}
-            className="w-full bg-slate-800/50 backdrop-blur-sm text-white border border-slate-700 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary"
-            placeholder="Enter collection name"
-            required
-          />
-        </div>
-        <div>
-          <label htmlFor="description" className="block text-sm font-medium text-gray-300 mb-1">
-            Description
-          </label>
-          <textarea
-            id="description"
-            value={collectionDescription}
-            onChange={(e) => setCollectionDescription(e.target.value)}
-            rows={3}
-            className="w-full bg-slate-800/50 backdrop-blur-sm text-white border border-slate-700 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary"
-            placeholder="Enter collection description"
-          />
-        </div>
-        
-        {availablePrompts.length > 0 ? (
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">
-              Select Prompts (Optional)
-            </label>
-            <div className="mb-2">
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-slate-800/50 backdrop-blur-sm text-white border border-slate-700 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary"
-                placeholder="Search prompts..."
-              />
-            </div>
-            <div className="max-h-60 overflow-y-auto p-2 bg-slate-800/30 rounded-md">
-              {filteredPrompts.length > 0 ? (
-                filteredPrompts.map(prompt => (
-                  <div 
-                    key={prompt._id} 
-                    className={`
-                      p-2 my-1 rounded cursor-pointer transition-colors flex items-center
-                      ${promptIds.includes(prompt._id) 
-                        ? 'bg-primary/20 border border-primary/30' 
-                        : 'hover:bg-slate-700/50 border border-transparent'
-                      }
-                    `}
-                    onClick={() => togglePromptSelection(prompt._id)}
-                  >
-                    <div className="flex-1">
-                      <div className="font-medium text-white">{prompt.content.split('\n')[0].substring(0, 25)}...</div>
-                    </div>
-                    <div className="ml-2">
-                      {promptIds.includes(prompt._id) ? (
-                        <svg className="text-primary" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M20 6 9 17l-5-5"></path>
-                        </svg>
-                      ) : (
-                        <svg className="text-gray-400" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <circle cx="12" cy="12" r="10"></circle>
-                        </svg>
-                      )}
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="text-center text-gray-400 py-4">
-                  No prompts match your search
-                </div>
-              )}
-            </div>
-            <div className="mt-2 text-sm text-gray-400">
-              Selected: {promptIds.length} of {availablePrompts.length} prompts
-            </div>
-          </div>
-        ) : (
-          <div className="text-gray-400 text-sm py-3 px-4 bg-slate-800/30 rounded-md">
-            You don't have any prompts yet. You can add prompts to this collection later.
-          </div>
-        )}
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div>
+        <label htmlFor="name" className="block text-sm font-medium text-gray-300 mb-2">
+          Name
+        </label>
+        <input
+          type="text"
+          id="name"
+          value={collectionName}
+          onChange={(e) => setCollectionName(e.target.value)}
+          className="input-primary"
+          placeholder="Enter collection name"
+          required
+        />
       </div>
+      <div>
+        <label htmlFor="description" className="block text-sm font-medium text-gray-300 mb-2">
+          Description
+        </label>
+        <textarea
+          id="description"
+          value={collectionDescription}
+          onChange={(e) => setCollectionDescription(e.target.value)}
+          rows={3}
+          className="input-primary"
+          placeholder="Enter collection description"
+        />
+      </div>
+      
+      {availablePrompts.length > 0 ? (
+        <div>
+          <label className="block text-sm font-medium text-gray-300 mb-2">
+            Select Prompts (Optional)
+          </label>
+          <div className="mb-2">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="input-primary"
+              placeholder="Search prompts..."
+            />
+          </div>
+          <div className="max-h-60 overflow-y-auto p-2 bg-slate-800/30 rounded-md">
+            {filteredPrompts.length > 0 ? (
+              filteredPrompts.map(prompt => (
+                <div 
+                  key={prompt._id} 
+                  className={`
+                    p-2 my-1 rounded cursor-pointer transition-all duration-200 flex items-center
+                    ${promptIds.includes(prompt._id) 
+                      ? 'bg-primary/20 border border-primary/30' 
+                      : 'hover:bg-slate-700/50 border border-transparent hover:border-primary/20'
+                    }
+                  `}
+                  onClick={() => togglePromptSelection(prompt._id)}
+                >
+                  <div className="flex-1">
+                    <div className="font-medium text-white">{prompt.content.split('\n')[0].substring(0, 25)}...</div>
+                  </div>
+                  <div className="ml-2">
+                    {promptIds.includes(prompt._id) ? (
+                      <svg className="text-primary" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M20 6 9 17l-5-5"></path>
+                      </svg>
+                    ) : (
+                      <svg className="text-gray-400" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="12" r="10"></circle>
+                      </svg>
+                    )}
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="text-center text-gray-400 py-4">
+                No prompts match your search
+              </div>
+            )}
+          </div>
+          <div className="mt-2 text-sm text-gray-400">
+            Selected: {promptIds.length} of {availablePrompts.length} prompts
+          </div>
+        </div>
+      ) : (
+        <div className="text-gray-400 text-sm py-3 px-4 bg-slate-800/30 rounded-md">
+          You don't have any prompts yet. You can add prompts to this collection later.
+        </div>
+      )}
       <div className="flex justify-end space-x-3 mt-6">
         <button 
           type="button" 
@@ -706,21 +711,29 @@ function PromptCard({ prompt, isSelectable = false, isSelected = false, onSelect
   const contentPreview = prompt.content.split('\n')[0].substring(0, 30);
 
   return (
-    <div className={`glass-card gradient-border p-4 flex flex-col transition-all duration-200 hover:translate-y-[-2px] ${isSelected ? 'ring-2 ring-primary' : ''} ${isSelectable ? 'hover:ring-1 hover:ring-primary/30' : ''}`}>
+    <div 
+      className={`glass-card p-4 flex flex-col transition-all duration-300 ${
+        isSelected ? 'active-card' : 'gradient-border'
+      } ${isSelectable ? 'cursor-pointer' : ''}`}
+      onClick={isSelectable ? onSelect : undefined}
+    >
       <div className="flex justify-between items-start mb-2">
         <div>
           <h3 className="font-medium text-white">{contentPreview}...</h3>
-          <p className="text-xs text-gray-400">
+          <p className="text-xs text-gray-400 mt-2">
             {prompt.content.length > 60 ? prompt.content.substring(0, 60) + '...' : prompt.content}
           </p>
         </div>
         <div className="relative">
           {isSelectable && (
             <button
-              onClick={onSelect}
-              className="p-1 rounded-md hover:bg-slate-700/50 transition-colors mr-2"
+              onClick={(e) => {
+                e.stopPropagation();
+                onSelect && onSelect();
+              }}
+              className="p-1.5 rounded-md hover:bg-slate-700/50 transition-colors mr-2 group"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={isSelected ? 'text-primary' : 'text-gray-400'}>
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={isSelected ? 'text-primary' : 'text-gray-400 group-hover:text-primary-light'}>
                 {isSelected ? (
                   <>
                     <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"></path>
@@ -733,10 +746,13 @@ function PromptCard({ prompt, isSelectable = false, isSelected = false, onSelect
             </button>
           )}
           <button 
-            onClick={() => setShowDropdown(!showDropdown)}
-            className="p-1 rounded-md hover:bg-slate-700/50 transition-colors"
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowDropdown(!showDropdown);
+            }}
+            className="p-1.5 rounded-md hover:bg-slate-700/50 transition-colors group"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400 group-hover:text-white">
               <circle cx="12" cy="12" r="1"></circle>
               <circle cx="19" cy="12" r="1"></circle>
               <circle cx="5" cy="12" r="1"></circle>
@@ -747,7 +763,8 @@ function PromptCard({ prompt, isSelectable = false, isSelected = false, onSelect
             <div className="absolute right-0 mt-1 w-48 glass-card border border-card rounded-md shadow-lg z-10">
               <div className="py-1">
                 <button
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.stopPropagation();
                     onEdit();
                     setShowDropdown(false);
                   }}
@@ -760,7 +777,8 @@ function PromptCard({ prompt, isSelectable = false, isSelected = false, onSelect
                   Edit
                 </button>
                 <button
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.stopPropagation();
                     onDelete();
                     setShowDropdown(false);
                   }}
@@ -775,7 +793,8 @@ function PromptCard({ prompt, isSelectable = false, isSelected = false, onSelect
                 </button>
                 {onTest && (
                   <button
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.stopPropagation();
                       onTest(prompt);
                       setShowDropdown(false);
                     }}
@@ -789,7 +808,8 @@ function PromptCard({ prompt, isSelectable = false, isSelected = false, onSelect
                   </button>
                 )}
                 <button
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.stopPropagation();
                     setShowExample(!showExample);
                     setShowDropdown(false);
                   }}
@@ -810,7 +830,7 @@ function PromptCard({ prompt, isSelectable = false, isSelected = false, onSelect
       <div className="flex-grow">
         <div className="flex items-center mt-2">
           <div className="w-4 h-4 rounded-full bg-gradient-to-r from-primary to-accent mr-2"></div>
-          <p className="text-sm font-medium text-gray-300">Content Length: <span className="text-primary">{prompt.content.length} chars</span></p>
+          <p className="text-sm font-medium text-gray-300">Length: <span className="text-primary">{prompt.content.length} chars</span></p>
         </div>
         
         <div className="mt-3 space-y-2">
@@ -819,16 +839,19 @@ function PromptCard({ prompt, isSelectable = false, isSelected = false, onSelect
           </p>
           
           {showExample && (
-            <div className="mt-3 pt-3 border-t border-slate-700">
+            <div className="mt-3 pt-3 border-t border-slate-700/50">
               <p className="text-xs text-primary-light mb-1">Example output:</p>
-              <p className="text-xs text-gray-300 line-clamp-4">{prompt.example}</p>
+              <p className="text-xs text-gray-300 line-clamp-4 bg-slate-800/30 p-2 rounded">{prompt.example}</p>
             </div>
           )}
         </div>
       </div>
       
-      <div className="mt-4 text-xs text-gray-400">
-        Created: {new Date(prompt.createdAt).toLocaleDateString()}
+      <div className="mt-4 flex justify-between items-center">
+        <span className="text-xs text-gray-400">
+          {new Date(prompt.createdAt).toLocaleDateString()}
+        </span>
+        <div className="pill-badge text-xs">Prompt</div>
       </div>
     </div>
   );
@@ -848,20 +871,20 @@ function CollectionCard({ collection, prompts, onEdit, onDelete, onRemovePrompt 
   const [showPrompts, setShowPrompts] = useState(false);
 
   return (
-    <div className="glass-card gradient-border p-4 flex flex-col transition-all duration-200 hover:translate-y-[-2px]">
+    <div className="glass-card p-4 flex flex-col transition-all duration-300">
       <div className="flex justify-between items-start mb-2">
         <div>
-          <h3 className="font-medium text-white">{collection.name}</h3>
-          <p className="text-xs text-gray-400">
+          <h3 className="font-medium gradient-text">{collection.name}</h3>
+          <p className="text-xs text-gray-400 mt-1">
             {collection.description}
           </p>
         </div>
         <div className="relative">
           <button 
             onClick={() => setShowDropdown(!showDropdown)}
-            className="p-1 rounded-md hover:bg-slate-700/50 transition-colors"
+            className="p-1.5 rounded-md hover:bg-slate-700/50 transition-colors group"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400 group-hover:text-white">
               <circle cx="12" cy="12" r="1"></circle>
               <circle cx="19" cy="12" r="1"></circle>
               <circle cx="5" cy="12" r="1"></circle>
@@ -918,9 +941,9 @@ function CollectionCard({ collection, prompts, onEdit, onDelete, onRemovePrompt 
           )}
           
           {showPrompts && (
-            <div className="fixed inset-0 bg-black bg-opacity-70 backdrop-blur-sm flex items-center justify-center z-50">
+            <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-50">
               <div className="glass-card gradient-border p-6 max-w-md w-full">
-                <h3 className="text-lg font-medium mb-4 text-white">Prompts in <span className="text-primary">{collection.name}</span></h3>
+                <h3 className="text-lg font-medium mb-4 gradient-text">{collection.name}</h3>
                 <div className="space-y-2 max-h-60 overflow-y-auto">
                   {prompts.length > 0 ? (
                     prompts.map(prompt => (
@@ -938,7 +961,7 @@ function CollectionCard({ collection, prompts, onEdit, onDelete, onRemovePrompt 
                       </div>
                     ))
                   ) : (
-                    <p className="text-center text-gray-400">No prompts in this collection</p>
+                    <p className="text-center text-gray-400 py-4">No prompts in this collection</p>
                   )}
                 </div>
                 <div className="flex justify-end mt-4">
@@ -956,35 +979,38 @@ function CollectionCard({ collection, prompts, onEdit, onDelete, onRemovePrompt 
       </div>
       
       <div className="flex-grow">
-        <div className="flex items-center mt-2">
+        <div className="flex items-center mt-2 mb-3">
           <div className="w-4 h-4 rounded-full bg-gradient-to-r from-primary to-accent mr-2"></div>
           <p className="text-sm font-medium text-gray-300">Prompts: <span className="text-primary">{collection.promptIds.length}</span></p>
         </div>
         {prompts.length > 0 ? (
-          <ul className="mt-3 space-y-2">
+          <ul className="space-y-2 bg-slate-800/20 p-3 rounded-lg">
             {prompts.slice(0, 3).map(prompt => (
-              <li key={prompt._id} className="text-xs text-gray-400 truncate flex items-center">
-                <svg className="mr-1 text-primary-light" xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <li key={prompt._id} className="text-xs text-gray-400 truncate flex items-center group">
+                <svg className="mr-1.5 text-primary-light" xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
                 </svg>
-                {prompt.content.split('\n')[0].substring(0, 25)}...
+                <span className="group-hover:text-white transition-colors">{prompt.content.split('\n')[0].substring(0, 25)}...</span>
               </li>
             ))}
             {prompts.length > 3 && (
               <li className="text-xs text-primary">
-                + {prompts.length - 3} more
+                + {prompts.length - 3} more prompts
               </li>
             )}
           </ul>
         ) : (
-          <p className="text-xs text-gray-400 mt-3">
-            No prompts in this collection
+          <p className="text-xs text-gray-400 mt-3 bg-slate-800/20 p-3 rounded-lg">
+            No prompts in this collection yet
           </p>
         )}
       </div>
       
-      <div className="mt-4 text-xs text-gray-400">
-        Created: {new Date(collection.createdAt).toLocaleDateString()}
+      <div className="mt-4 flex justify-between items-center">
+        <span className="text-xs text-gray-400">
+          {new Date(collection.createdAt).toLocaleDateString()}
+        </span>
+        <div className="pill-badge text-xs">Collection</div>
       </div>
     </div>
   );

@@ -219,18 +219,6 @@ export default function BusinessContext() {
   try {
     return (
       <div className="space-y-8">
-        {/* Connection Debug Info (only in dev) */}
-        {process.env.NODE_ENV !== 'production' && connectionStatus && (
-          <div className="glass-card p-4 text-xs border border-green-500">
-            <div className="flex items-center text-green-400">
-              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-              Database connected! Response time: {Date.now() - connectionStatus.timestamp}ms
-            </div>
-          </div>
-        )}
-
         {/* Header Section */}
         <div className="glass-card p-6 backdrop-blur-sm">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
@@ -292,7 +280,7 @@ export default function BusinessContext() {
               {filteredContexts.map((context: BusinessContext) => (
                 <div 
                   key={context._id} 
-                  className="glass-card gradient-border p-0 transition-all duration-200 hover:translate-y-[-2px] overflow-hidden group"
+                  className="glass-card p-0 transition-all duration-200 hover:translate-y-[-2px] overflow-hidden group"
                 >
                   <div className={`h-1.5 w-full bg-gradient-to-r ${generateColor(context.title)}`}></div>
                   <div className="p-6">

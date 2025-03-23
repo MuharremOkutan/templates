@@ -1,109 +1,100 @@
-import { ConvexError } from "convex/values";
+import { v } from "convex/values";
 import { QueryCtx, MutationCtx, ActionCtx } from "./_generated/server";
-import { DataModel } from "./_generated/dataModel";
+import { Id } from "./_generated/dataModel";
 import { api } from "./_generated/api";
 
-// Get the current user ID from the context
+/**
+ * Get the user from the provided context
+ * Check if the user exists and is authenticated
+ * @param ctx Query, Mutation, or Action context
+ * @returns The user document or null if not authenticated
+ */
 export async function getUser(ctx: QueryCtx | MutationCtx) {
+  // Get the user ID from the auth rule
   const identity = await ctx.auth.getUserIdentity();
   if (!identity) {
-    throw new ConvexError("Not authenticated");
+    return null;
   }
-  
-  // First try to get user by tokenIdentifier
-  let user = await ctx.db
+
+  // Check if we've stored this identity before (should have an associated user document for the given token)
+  const user = await ctx.db
     .query("users")
-    .withIndex("by_token", (q: any) => q.eq("tokenIdentifier", identity.tokenIdentifier))
-    .unique();
-  
-  // If not found, try to find by email (for legacy users)
-  if (!user && identity.email) {
-    const possibleUsers = await ctx.db
-      .query("users")
-      .filter((q) => q.eq(q.field("email"), identity.email))
-      .collect();
-    
-    if (possibleUsers.length > 0) {
-      user = possibleUsers[0];
-      
-      // If this is a mutation context, we can update the user
-      const isMutation = 'patch' in ctx.db;
-      if (isMutation) {
-        // Only update in mutation context
-        await (ctx.db as MutationCtx['db']).patch(user._id, {
-          tokenIdentifier: identity.tokenIdentifier
-        });
-      }
-    }
-  }
-  
-  // If still no user found and we have a mutation context, create a new user
-  if (!user && 'insert' in ctx.db) {
-    console.log("Creating new user for tokenIdentifier:", identity.tokenIdentifier);
-    
-    try {
-      // Create a new user record
-      const userId = await (ctx.db as MutationCtx['db']).insert("users", {
-        tokenIdentifier: identity.tokenIdentifier,
-        email: identity.email,
-        name: identity.name || identity.email?.split('@')[0] || "User"
-      });
-      
-      // Fetch the created user
-      user = await ctx.db.get(userId);
-    } catch (error) {
-      console.error("Failed to create new user:", error);
-      throw new ConvexError("Failed to create user account");
-    }
-  }
-  
+    .withIndex("by_token", (q) => q.eq("tokenIdentifier", identity.tokenIdentifier))
+    .first();
+
   if (!user) {
-    throw new ConvexError("User not found. Please try signing out and signing back in.");
+    console.warn(`User not found with tokenIdentifier: ${identity.tokenIdentifier}`);
+    return null;
   }
-  
+
   return user;
 }
 
-// Separate function for action context which doesn't have direct db access
+/**
+ * Helper to get the user from the provided context
+ * Asserts that the user exists and is authenticated
+ * @param ctx
+ * @returns The user document (thrown an error if not authenticated)
+ */
+export async function assertUser(ctx: QueryCtx | MutationCtx) {
+  const user = await getUser(ctx);
+  if (!user) {
+    throw new Error("Not authenticated");
+  }
+  return user;
+}
+
+// Added for explorationFunctions.ts compatibility
+export async function getUserFromContext(ctx: QueryCtx | MutationCtx) {
+  return getUser(ctx);
+}
+
+// Action context variant
 export async function getUserFromAction(ctx: ActionCtx) {
   const identity = await ctx.auth.getUserIdentity();
   if (!identity) {
-    throw new ConvexError("Not authenticated");
+    return null;
   }
-  
+
   try {
-    // For actions, we need to use ctx.runQuery
-    let user = await ctx.runQuery(api.auth.getUserByToken, {
-      tokenIdentifier: identity.tokenIdentifier,
-      email: identity.email
+    // Check if we've stored this identity before
+    const tokenIdentifier = identity.tokenIdentifier;
+    
+    // Use the proper function reference syntax
+    const user = await ctx.runQuery(api.auth.getUserByToken, { 
+      tokenIdentifier, 
+      email: identity.email 
     });
     
-    // If no user was found, try to create one
     if (!user) {
-      // Try to create a new user
-      const userId = await ctx.runMutation(api.auth.createNewUser, {
-        tokenIdentifier: identity.tokenIdentifier,
-        email: identity.email,
-        name: identity.name || identity.email?.split('@')[0] || "User"
-      });
+      console.warn(`User not found for token: ${tokenIdentifier}`);
       
-      // Fetch the new user
-      user = await ctx.runQuery(api.auth.getUserById, { id: userId });
-    } else if (user.tokenIdentifier !== identity.tokenIdentifier) {
-      // Update tokenIdentifier if needed
-      await ctx.runMutation(api.auth.updateUserTokenIdentifier, {
-        userId: user._id,
-        tokenIdentifier: identity.tokenIdentifier
-      });
-    }
-    
-    if (!user) {
-      throw new ConvexError("User not found even after creation attempt");
+      // Try to create a new user if none exists
+      try {
+        const name = identity.name || identity.email?.split('@')[0] || "User";
+        const email = identity.email;
+        
+        const userId = await ctx.runMutation(api.auth.createNewUser, {
+          tokenIdentifier,
+          email,
+          name
+        });
+        
+        // Fetch the new user
+        if (userId) {
+          const newUser = await ctx.runQuery(api.auth.getUserById, { id: userId });
+          return newUser;
+        }
+        return null;
+      } catch (createError) {
+        console.error("Error creating user:", createError);
+        return null;
+      }
     }
     
     return user;
   } catch (error) {
     console.error("Error getting user from action:", error);
-    throw new ConvexError("Failed to retrieve user");
+    return null;
   }
 } 

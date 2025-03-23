@@ -19,6 +19,7 @@ import ViewBusinessContext from "./ViewBusinessContext";
 import React, { Component, ErrorInfo, ReactNode } from "react";
 import News from "./News";
 import NewsDetail from "./NewsDetail";
+import Exploration from "./Exploration";
 
 // Define a simple error boundary component
 class SimpleErrorBoundary extends Component<{ children: ReactNode }> {
@@ -60,7 +61,7 @@ export default function App() {
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-pulse-slow w-12 h-12 rounded-full bg-gradient-to-r from-primary to-accent"></div>
+        <div className="w-12 h-12 rounded-full bg-gradient-to-r from-primary to-accent"></div>
       </div>
     );
   }
@@ -68,7 +69,7 @@ export default function App() {
   return (
     <Router>
       <div className="min-h-screen">
-        {/* Noise Background */}
+        {/* Keep Noise Background for texture only */}
         <div className="noise"></div>
         
         {/* Header */}
@@ -79,31 +80,37 @@ export default function App() {
               <nav className="hidden md:flex space-x-6">
                 <Link
                   to="/"
-                  className="font-medium text-gray-300 hover:text-white transition-colors"
+                  className="font-medium text-gray-300 hover:text-white transition-colors relative after:absolute after:bottom-0 after:left-0 after:h-[2px] after:w-0 after:bg-primary after:transition-all hover:after:w-full"
                 >
                   Home
                 </Link>
                 <Link
                   to="/dashboard"
-                  className="font-medium text-gray-300 hover:text-white transition-colors"
+                  className="font-medium text-gray-300 hover:text-white transition-colors relative after:absolute after:bottom-0 after:left-0 after:h-[2px] after:w-0 after:bg-primary after:transition-all hover:after:w-full"
                 >
                   Dashboard
                 </Link>
                 <Link
                   to="/prompts"
-                  className="font-medium text-gray-300 hover:text-white transition-colors"
+                  className="font-medium text-gray-300 hover:text-white transition-colors relative after:absolute after:bottom-0 after:left-0 after:h-[2px] after:w-0 after:bg-primary after:transition-all hover:after:w-full"
                 >
                   Prompts
                 </Link>
                 <Link
                   to="/business-context"
-                  className="font-medium text-gray-300 hover:text-white transition-colors"
+                  className="font-medium text-gray-300 hover:text-white transition-colors relative after:absolute after:bottom-0 after:left-0 after:h-[2px] after:w-0 after:bg-primary after:transition-all hover:after:w-full"
                 >
                   Business Context
                 </Link>
                 <Link
+                  to="/exploration"
+                  className="font-medium text-gray-300 hover:text-white transition-colors relative after:absolute after:bottom-0 after:left-0 after:h-[2px] after:w-0 after:bg-primary after:transition-all hover:after:w-full"
+                >
+                  Exploration
+                </Link>
+                <Link
                   to="/news"
-                  className="font-medium text-gray-300 hover:text-white transition-colors"
+                  className="font-medium text-gray-300 hover:text-white transition-colors relative after:absolute after:bottom-0 after:left-0 after:h-[2px] after:w-0 after:bg-primary after:transition-all hover:after:w-full"
                 >
                   News
                 </Link>
@@ -141,6 +148,22 @@ export default function App() {
                 <Unauthenticated>
                   <div className="glass-card p-8 flex flex-col items-center justify-center">
                     <p className="mb-4 text-gray-300">Please sign in to view your dashboard</p>
+                    <SignInForm />
+                  </div>
+                </Unauthenticated>
+              </>
+            } />
+            <Route path="/exploration" element={
+              <>
+                <h1 className="text-2xl font-bold mb-6 gradient-text">Exploration</h1>
+                <Authenticated>
+                  <SimpleErrorBoundary>
+                    <Exploration />
+                  </SimpleErrorBoundary>
+                </Authenticated>
+                <Unauthenticated>
+                  <div className="glass-card p-8 flex flex-col items-center justify-center">
+                    <p className="mb-4 text-gray-300">Please sign in to access exploration tools</p>
                     <SignInForm />
                   </div>
                 </Unauthenticated>
@@ -429,7 +452,7 @@ function ResourceCard({
   href: string;
 }) {
   return (
-    <div className="glass-card gradient-border p-4 h-auto transition-all hover:translate-y-[-2px]">
+    <div className="glass-card gradient-border p-4 h-auto hover-glow shimmer transition-all">
       <a href={href} className="text-primary font-medium hover:text-primary-light transition-colors">
         {title}
       </a>
