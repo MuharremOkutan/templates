@@ -17,16 +17,16 @@ export const listPrompts = query({
 
 export const createPrompt = mutation({
   args: {
-    title: v.string(),
     content: v.string(),
+    example: v.string(),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
 
     const promptId = await ctx.db.insert("prompts", {
-      title: args.title,
       content: args.content,
+      example: args.example,
       userId,
       createdAt: Date.now(),
     });
@@ -38,8 +38,8 @@ export const createPrompt = mutation({
 export const updatePrompt = mutation({
   args: {
     id: v.id("prompts"),
-    title: v.string(),
     content: v.string(),
+    example: v.string(),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -50,8 +50,8 @@ export const updatePrompt = mutation({
     if (prompt.userId !== userId) throw new Error("Not authorized");
 
     await ctx.db.patch(args.id, {
-      title: args.title,
       content: args.content,
+      example: args.example,
     });
 
     return args.id;

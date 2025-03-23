@@ -1,14 +1,15 @@
 import { useState } from "react";
-import { useQuery, useMutation } from "convex/react";
+import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "../convex/_generated/api";
 import { Id } from "../convex/_generated/dataModel";
+import { AITester } from "./components";
 
 // Types for our data
 interface Prompt {
   _id: Id<"prompts">;
   _creationTime: number;
-  title: string;
   content: string;
+  example: string;
   userId: Id<"users">;
   createdAt: number;
 }
@@ -40,7 +41,7 @@ export default function Prompts() {
   const addPromptsToCollectionMutation = useMutation(api.promptFunctions.addPromptsToCollection);
   const removePromptFromCollectionMutation = useMutation(api.promptFunctions.removePromptFromCollection);
 
-  const [activeTab, setActiveTab] = useState<"prompts" | "collections">("prompts");
+  const [activeTab, setActiveTab] = useState<string>("prompts");
   const [activePrompt, setActivePrompt] = useState<Prompt | null>(null);
   const [activeCollection, setActiveCollection] = useState<Collection | null>(null);
   const [isCreatingPrompt, setIsCreatingPrompt] = useState(false);
@@ -48,20 +49,21 @@ export default function Prompts() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedPrompts, setSelectedPrompts] = useState<Id<"prompts">[]>([]);
 
-  // CRUD operations for prompts
-  const handleCreatePrompt = async (promptData: { title: string; content: string; }) => {
-    await createPromptMutation({
-      title: promptData.title,
-      content: promptData.content,
-    });
+  // Add new states for AI testing
+  const [testingPrompt, setTestingPrompt] = useState<Prompt | null>(null);
+
+  // Create handlers
+  const handleCreatePrompt = async (content: string, example: string) => {
+    await createPromptMutation({ content, example });
     setIsCreatingPrompt(false);
   };
 
-  const handleUpdatePrompt = async (updatedPrompt: Prompt) => {
+  const handleUpdatePrompt = async (content: string, example: string) => {
+    if (!activePrompt) return;
     await updatePromptMutation({
-      id: updatedPrompt._id,
-      title: updatedPrompt.title,
-      content: updatedPrompt.content,
+      id: activePrompt._id,
+      content,
+      example
     });
     setActivePrompt(null);
   };
@@ -71,22 +73,19 @@ export default function Prompts() {
   };
 
   // CRUD operations for collections
-  const handleCreateCollection = async (collectionData: { name: string; description?: string; }) => {
-    await createCollectionMutation({
-      name: collectionData.name,
-      description: collectionData.description,
-      promptIds: selectedPrompts,
-    });
+  const handleCreateCollection = async (name: string, description: string, promptIds: Id<"prompts">[]) => {
+    await createCollectionMutation({ name, description, promptIds });
     setIsCreatingCollection(false);
     setSelectedPrompts([]);
   };
 
-  const handleUpdateCollection = async (updatedCollection: Collection) => {
+  const handleUpdateCollection = async (name: string, description: string, promptIds: Id<"prompts">[]) => {
+    if (!activeCollection) return;
     await updateCollectionMutation({
-      id: updatedCollection._id,
-      name: updatedCollection.name,
-      description: updatedCollection.description,
-      promptIds: updatedCollection.promptIds,
+      id: activeCollection._id,
+      name,
+      description,
+      promptIds
     });
     setActiveCollection(null);
   };
@@ -127,8 +126,8 @@ export default function Prompts() {
 
   // Filter prompts based on search query
   const filteredPrompts = prompts.filter(prompt => 
-    prompt.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    prompt.content.toLowerCase().includes(searchQuery.toLowerCase())
+    prompt.content.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    prompt.example.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   // Filter collections based on search query
@@ -137,31 +136,39 @@ export default function Prompts() {
     (collection.description && collection.description.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
+  // Handler for testing a prompt with OpenAI
+  const handleTestPrompt = (prompt: Prompt) => {
+    setTestingPrompt(prompt);
+  };
+
   // Handle loading state
   if (prompts === undefined || collections === undefined) {
     return (
       <div className="w-full max-w-6xl mx-auto text-center py-10">
-        <p className="text-slate-500 dark:text-slate-400">Loading...</p>
+        <div className="flex justify-center">
+          <div className="animate-pulse-slow w-8 h-8 rounded-full bg-gradient-to-r from-primary to-accent"></div>
+        </div>
+        <p className="text-gray-400 mt-4">Loading your prompts...</p>
       </div>
     );
   }
 
   return (
-    <div className="w-full max-w-6xl mx-auto">
-      <div className="flex flex-col gap-6">
-        <p className="text-slate-500 dark:text-slate-400">Welcome, {viewer ?? "User"}! Manage your prompts and collections here.</p>
+    <div className="w-full max-w-6xl mx-auto px-4">
+      <div className="flex flex-col gap-6 py-6">
+        <p className="text-gray-300">Welcome, <span className="text-primary">{viewer ?? "User"}</span>! Manage your prompts and collections here.</p>
         
         {/* Search and actions */}
-        <div className="flex justify-between items-center">
+        <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
           <div className="relative w-full max-w-sm">
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search prompts or collections..."
-              className="bg-background text-foreground w-full rounded-md p-2 border-2 border-slate-200 dark:border-slate-800 pr-8"
+              className="w-full bg-slate-800/50 backdrop-blur-sm text-white border border-slate-700 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary pl-10"
             />
-            <span className="absolute right-2 top-2.5 text-slate-400">
+            <span className="absolute left-3 top-2.5 text-gray-400">
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="11" cy="11" r="8"></circle>
                 <path d="m21 21-4.3-4.3"></path>
@@ -170,10 +177,10 @@ export default function Prompts() {
           </div>
           <div className="flex gap-2">
             <button
-              className="bg-slate-200 dark:bg-slate-800 text-foreground rounded-md px-4 py-2 flex items-center gap-1"
+              className="btn-primary"
               onClick={() => setIsCreatingPrompt(true)}
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1">
                 <path d="M5 12h14"></path>
                 <path d="M12 5v14"></path>
               </svg>
@@ -181,13 +188,13 @@ export default function Prompts() {
             </button>
             {activeTab === "prompts" && filteredPrompts.length > 0 && (
               <button
-                className="bg-slate-200 dark:bg-slate-800 text-foreground rounded-md px-4 py-2 flex items-center gap-1"
+                className="btn-secondary"
                 onClick={() => {
                   setIsCreatingCollection(true);
                   setSelectedPrompts([]);
                 }}
               >
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1">
                   <path d="M12 10v6"></path>
                   <path d="M9 13h6"></path>
                   <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"></path>
@@ -199,25 +206,27 @@ export default function Prompts() {
         </div>
         
         {/* Tabs */}
-        <div className="border-b border-slate-200 dark:border-slate-800">
-          <div className="flex">
-            <button
-              className={`py-2 px-4 font-medium ${
-                activeTab === "prompts" ? "border-b-2 border-slate-800 dark:border-slate-200" : "text-slate-500"
-              }`}
-              onClick={() => setActiveTab("prompts")}
-            >
-              All Prompts
-            </button>
-            <button
-              className={`py-2 px-4 font-medium ${
-                activeTab === "collections" ? "border-b-2 border-slate-800 dark:border-slate-200" : "text-slate-500"
-              }`}
-              onClick={() => setActiveTab("collections")}
-            >
-              Collections
-            </button>
-          </div>
+        <div className="glass-card inline-flex p-1 rounded-lg self-start">
+          <button
+            className={`py-2 px-4 rounded-md transition-colors ${
+              activeTab === "prompts" 
+                ? "bg-primary text-white" 
+                : "text-gray-300 hover:text-white hover:bg-slate-800/50"
+            }`}
+            onClick={() => setActiveTab("prompts")}
+          >
+            All Prompts
+          </button>
+          <button
+            className={`py-2 px-4 rounded-md transition-colors ${
+              activeTab === "collections" 
+                ? "bg-primary text-white" 
+                : "text-gray-300 hover:text-white hover:bg-slate-800/50"
+            }`}
+            onClick={() => setActiveTab("collections")}
+          >
+            Collections
+          </button>
         </div>
         
         {/* Content */}
@@ -229,6 +238,7 @@ export default function Prompts() {
                 prompt={prompt}
                 onEdit={() => setActivePrompt(prompt)}
                 onDelete={() => handleDeletePrompt(prompt._id)}
+                onTest={handleTestPrompt}
               />
             ))}
           </div>
@@ -236,18 +246,18 @@ export default function Prompts() {
         
         {activeTab === "prompts" && isCreatingCollection && (
           <>
-            <div className="bg-slate-100 dark:bg-slate-800 p-4 rounded-md mb-4">
+            <div className="glass-card p-4 rounded-md mb-4">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="font-medium">Select prompts to include in the collection</h3>
+                <h3 className="font-medium text-white">Select prompts to include in the collection</h3>
                 <div className="flex gap-2">
                   <button
-                    className="bg-slate-200 dark:bg-slate-700 text-foreground rounded-md px-4 py-2 text-sm"
+                    className="btn-secondary"
                     onClick={() => setIsCreatingCollection(false)}
                   >
                     Cancel
                   </button>
                   <button
-                    className="bg-foreground text-background rounded-md px-4 py-2 text-sm"
+                    className="btn-primary"
                     onClick={() => {
                       if (selectedPrompts.length > 0) {
                         setIsCreatingCollection(true);
@@ -270,6 +280,7 @@ export default function Prompts() {
                   onSelect={() => togglePromptSelection(prompt._id)}
                   onEdit={() => setActivePrompt(prompt)}
                   onDelete={() => handleDeletePrompt(prompt._id)}
+                  onTest={handleTestPrompt}
                 />
               ))}
             </div>
@@ -292,31 +303,57 @@ export default function Prompts() {
         )}
         
         {activeTab === "prompts" && filteredPrompts.length === 0 && (
-          <div className="text-center py-10">
-            <p className="text-slate-500 dark:text-slate-400">
+          <div className="glass-card p-8 text-center">
+            <p className="text-gray-300 mb-4">
               {searchQuery ? "No prompts match your search." : "You don't have any prompts yet."}
             </p>
+            {!searchQuery && (
+              <button
+                className="btn-primary"
+                onClick={() => setIsCreatingPrompt(true)}
+              >
+                Create your first prompt
+              </button>
+            )}
           </div>
         )}
         
         {activeTab === "collections" && filteredCollections.length === 0 && (
-          <div className="text-center py-10">
-            <p className="text-slate-500 dark:text-slate-400">
+          <div className="glass-card p-8 text-center">
+            <p className="text-gray-300 mb-4">
               {searchQuery ? "No collections match your search." : "You don't have any collections yet."}
             </p>
+            {!searchQuery && (
+              <button
+                className="btn-primary"
+                onClick={() => setIsCreatingCollection(true)}
+              >
+                Create your first collection
+              </button>
+            )}
           </div>
         )}
       </div>
       
+      {/* Add AI Test Modal */}
+      {testingPrompt && (
+        <div className="fixed inset-0 bg-black bg-opacity-70 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="relative w-full max-w-4xl">
+            <AITester 
+              initialPrompt={testingPrompt.content}
+              onClose={() => setTestingPrompt(null)}
+            />
+          </div>
+        </div>
+      )}
+      
       {/* Create/Edit Prompt Modal */}
       {(isCreatingPrompt || activePrompt) && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-background rounded-md p-6 max-w-md w-full">
-            <h2 className="text-xl font-bold mb-4">
-              {activePrompt ? "Edit Prompt" : "Create New Prompt"}
-            </h2>
+        <div className="fixed inset-0 bg-black bg-opacity-70 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="max-w-2xl w-full">
             <PromptForm
-              prompt={activePrompt}
+              content={activePrompt?.content}
+              example={activePrompt?.example}
               onSubmit={activePrompt ? handleUpdatePrompt : handleCreatePrompt}
               onCancel={() => {
                 setActivePrompt(null);
@@ -329,25 +366,17 @@ export default function Prompts() {
       
       {/* Create/Edit Collection Modal */}
       {(isCreatingCollection && selectedPrompts.length > 0 || activeCollection) && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-background rounded-md p-6 max-w-md w-full">
-            <h2 className="text-xl font-bold mb-4">
+        <div className="fixed inset-0 bg-black bg-opacity-70 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="glass-card gradient-border p-6 max-w-md w-full">
+            <h2 className="text-xl font-medium mb-4 gradient-text">
               {activeCollection ? "Edit Collection" : "Create New Collection"}
             </h2>
             <CollectionForm
-              collection={activeCollection}
-              availablePrompts={prompts}
+              name={activeCollection?.name}
+              description={activeCollection?.description}
+              prompts={prompts}
               selectedPromptIds={activeCollection ? activeCollection.promptIds : selectedPrompts}
-              onPromptSelectionChange={(ids) => {
-                if (activeCollection) {
-                  setActiveCollection({
-                    ...activeCollection,
-                    promptIds: ids
-                  });
-                } else {
-                  setSelectedPrompts(ids);
-                }
-              }}
+              availablePrompts={prompts}
               onSubmit={activeCollection ? handleUpdateCollection : handleCreateCollection}
               onCancel={() => {
                 setActiveCollection(null);
@@ -366,220 +395,287 @@ export default function Prompts() {
 
 // Prompt Form Component
 interface PromptFormProps {
-  prompt?: Prompt | null;
-  onSubmit: (prompt: any) => void;
+  content?: string;
+  example?: string;
+  onSubmit: (content: string, example: string) => void;
   onCancel: () => void;
 }
 
-function PromptForm({ prompt, onSubmit, onCancel }: PromptFormProps) {
-  const [title, setTitle] = useState(prompt?.title || "");
-  const [content, setContent] = useState(prompt?.content || "");
+function PromptForm({ content = '', example = '', onSubmit, onCancel }: PromptFormProps) {
+  const [promptContent, setPromptContent] = useState(content);
+  const [promptExample, setPromptExample] = useState(example);
+  const [showTester, setShowTester] = useState(false);
+  const [testResponse, setTestResponse] = useState<string | null>(null);
+  const [isTestingMode, setIsTestingMode] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (prompt) {
-      onSubmit({
-        ...prompt,
-        title,
-        content,
-      });
-    } else {
-      onSubmit({
-        title,
-        content,
-      });
-    }
+    onSubmit(promptContent, testResponse || promptExample);
+  };
+
+  const handleSaveTest = (response: string) => {
+    setTestResponse(response);
+    setPromptExample(response);
+    setShowTester(false);
+    setIsTestingMode(false);
   };
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-      <div>
-        <label className="block text-sm font-medium mb-1">Title</label>
-        <input
-          type="text"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder="Enter prompt title"
-          className="bg-background text-foreground w-full rounded-md p-2 border-2 border-slate-200 dark:border-slate-800"
-          required
-        />
-      </div>
-      <div>
-        <label className="block text-sm font-medium mb-1">Content</label>
-        <textarea
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
-          placeholder="Enter prompt content"
-          className="bg-background text-foreground w-full rounded-md p-2 border-2 border-slate-200 dark:border-slate-800 min-h-[120px]"
-          required
-        />
-      </div>
-      <div className="flex justify-end gap-2 mt-4">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="bg-slate-200 dark:bg-slate-800 text-foreground rounded-md px-4 py-2"
-        >
-          Cancel
-        </button>
-        <button
-          type="submit"
-          className="bg-foreground text-background rounded-md px-4 py-2"
-        >
-          {prompt ? "Save Changes" : "Create Prompt"}
-        </button>
-      </div>
-    </form>
+    <div className="glass-card p-6 w-full max-w-2xl">
+      <h3 className="text-lg font-medium mb-4 gradient-text">
+        {content ? 'Edit Prompt' : 'Create New Prompt'}
+      </h3>
+      
+      {!isTestingMode ? (
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label htmlFor="content" className="block text-sm font-medium text-gray-300 mb-1">
+              Prompt Content
+            </label>
+            <textarea
+              id="content"
+              value={promptContent}
+              onChange={(e) => setPromptContent(e.target.value)}
+              rows={6}
+              className="w-full bg-slate-800/50 backdrop-blur-sm text-white border border-slate-700 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary"
+              placeholder="Enter your prompt content..."
+              required
+            />
+          </div>
+          
+          {testResponse ? (
+            <div>
+              <div className="flex justify-between items-center mb-1">
+                <label htmlFor="example" className="block text-sm font-medium text-gray-300">
+                  Test Result (will be saved as example)
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setTestResponse(null)}
+                  className="text-xs text-primary hover:text-primary-light"
+                >
+                  Clear
+                </button>
+              </div>
+              <div className="glass-card p-3 bg-slate-800/30 rounded-md whitespace-pre-wrap text-gray-300 text-sm max-h-60 overflow-y-auto">
+                {testResponse}
+              </div>
+            </div>
+          ) : (
+            <div>
+              <label htmlFor="example" className="block text-sm font-medium text-gray-300 mb-1">
+                Example Output
+              </label>
+              <textarea
+                id="example"
+                value={promptExample}
+                onChange={(e) => setPromptExample(e.target.value)}
+                rows={6}
+                className="w-full bg-slate-800/50 backdrop-blur-sm text-white border border-slate-700 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary"
+                placeholder="Enter an example output from this prompt..."
+                required
+              />
+            </div>
+          )}
+          
+          <div className="flex justify-between items-center pt-2">
+            <button
+              type="button"
+              onClick={() => setIsTestingMode(true)}
+              className="btn-secondary flex items-center"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2">
+                <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"></path>
+                <path d="m9 12 2 2 4-4"></path>
+              </svg>
+              Test with OpenAI
+            </button>
+            <div className="flex gap-2">
+              <button 
+                type="button" 
+                onClick={onCancel}
+                className="btn-secondary"
+              >
+                Cancel
+              </button>
+              <button 
+                type="submit"
+                className="btn-primary"
+              >
+                {content ? 'Update' : 'Create'}
+              </button>
+            </div>
+          </div>
+        </form>
+      ) : (
+        <div className="space-y-6">
+          <div>
+            <div className="flex justify-between items-center mb-2">
+              <h4 className="text-md font-medium text-white">Test Your Prompt</h4>
+              <button
+                onClick={() => setIsTestingMode(false)}
+                className="text-sm text-gray-400 hover:text-white"
+              >
+                Back to Edit
+              </button>
+            </div>
+            <AITester 
+              initialPrompt={promptContent}
+              onClose={() => setIsTestingMode(false)}
+              onSaveResponse={handleSaveTest}
+            />
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
 // Collection Form Component
 interface CollectionFormProps {
-  collection?: Collection | null;
-  availablePrompts: Prompt[];
-  selectedPromptIds: Id<"prompts">[];
-  onPromptSelectionChange: (promptIds: Id<"prompts">[]) => void;
-  onSubmit: (collection: any) => void;
+  name?: string;
+  description?: string;
+  prompts?: Prompt[];
+  selectedPromptIds?: Id<"prompts">[];
+  availablePrompts?: Prompt[];
+  onSubmit: (name: string, description: string, promptIds: Id<"prompts">[]) => void;
   onCancel: () => void;
 }
 
 function CollectionForm({ 
-  collection, 
-  availablePrompts, 
-  selectedPromptIds,
-  onPromptSelectionChange,
+  name = '', 
+  description = '', 
+  selectedPromptIds = [], 
+  availablePrompts = [],
   onSubmit, 
   onCancel 
 }: CollectionFormProps) {
-  const [name, setName] = useState(collection?.name || "");
-  const [description, setDescription] = useState(collection?.description || "");
-  const [promptSearch, setPromptSearch] = useState("");
+  const [collectionName, setCollectionName] = useState(name);
+  const [collectionDescription, setCollectionDescription] = useState(description);
+  const [promptIds, setPromptIds] = useState<Id<"prompts">[]>(selectedPromptIds);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (collection) {
-      onSubmit({
-        ...collection,
-        name,
-        description,
-        promptIds: selectedPromptIds,
-      });
-    } else {
-      onSubmit({
-        name,
-        description,
-      });
-    }
+    onSubmit(collectionName, collectionDescription, promptIds);
   };
 
   const togglePromptSelection = (promptId: Id<"prompts">) => {
-    if (selectedPromptIds.includes(promptId)) {
-      onPromptSelectionChange(selectedPromptIds.filter(id => id !== promptId));
+    if (promptIds.includes(promptId)) {
+      setPromptIds(promptIds.filter(id => id !== promptId));
     } else {
-      onPromptSelectionChange([...selectedPromptIds, promptId]);
+      setPromptIds([...promptIds, promptId]);
     }
   };
 
-  const filteredPrompts = availablePrompts.filter(p => 
-    p.title.toLowerCase().includes(promptSearch.toLowerCase()) ||
-    p.content.toLowerCase().includes(promptSearch.toLowerCase())
+  const filteredPrompts = availablePrompts.filter(prompt => 
+    prompt.content.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    prompt.example.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-      <div>
-        <label className="block text-sm font-medium mb-1">Name</label>
-        <input
-          type="text"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="Enter collection name"
-          className="bg-background text-foreground w-full rounded-md p-2 border-2 border-slate-200 dark:border-slate-800"
-          required
-        />
-      </div>
-      <div>
-        <label className="block text-sm font-medium mb-1">Description</label>
-        <input
-          type="text"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          placeholder="Enter collection description"
-          className="bg-background text-foreground w-full rounded-md p-2 border-2 border-slate-200 dark:border-slate-800"
-        />
-      </div>
-      
-      <div>
-        <label className="block text-sm font-medium mb-1">Select Prompts</label>
-        <div className="relative mb-2">
+    <form onSubmit={handleSubmit} className="glass-card p-6">
+      <h3 className="text-lg font-medium mb-4 gradient-text">
+        {name ? 'Edit Collection' : 'Create New Collection'}
+      </h3>
+      <div className="space-y-4">
+        <div>
+          <label htmlFor="name" className="block text-sm font-medium text-gray-300 mb-1">
+            Name
+          </label>
           <input
             type="text"
-            value={promptSearch}
-            onChange={(e) => setPromptSearch(e.target.value)}
-            placeholder="Search prompts..."
-            className="bg-background text-foreground w-full rounded-md p-2 border-2 border-slate-200 dark:border-slate-800 pr-8"
+            id="name"
+            value={collectionName}
+            onChange={(e) => setCollectionName(e.target.value)}
+            className="w-full bg-slate-800/50 backdrop-blur-sm text-white border border-slate-700 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary"
+            placeholder="Enter collection name"
+            required
           />
-          <span className="absolute right-2 top-2.5 text-slate-400">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="11" cy="11" r="8"></circle>
-              <path d="m21 21-4.3-4.3"></path>
-            </svg>
-          </span>
+        </div>
+        <div>
+          <label htmlFor="description" className="block text-sm font-medium text-gray-300 mb-1">
+            Description
+          </label>
+          <textarea
+            id="description"
+            value={collectionDescription}
+            onChange={(e) => setCollectionDescription(e.target.value)}
+            rows={3}
+            className="w-full bg-slate-800/50 backdrop-blur-sm text-white border border-slate-700 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary"
+            placeholder="Enter collection description"
+          />
         </div>
         
-        <div className="border-2 border-slate-200 dark:border-slate-800 rounded-md max-h-48 overflow-y-auto">
-          {filteredPrompts.length > 0 ? (
-            <div className="divide-y divide-slate-200 dark:divide-slate-800">
-              {filteredPrompts.map(prompt => (
-                <div 
-                  key={prompt._id} 
-                  className="flex items-center gap-2 p-2 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
-                  onClick={() => togglePromptSelection(prompt._id)}
-                >
-                  <div className="flex-shrink-0">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      {selectedPromptIds.includes(prompt._id) ? (
-                        <>
-                          <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"></path>
-                          <path d="m9 12 2 2 4-4"></path>
-                        </>
-                      ) : (
-                        <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"></path>
-                      )}
-                    </svg>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{prompt.title}</p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{prompt.content}</p>
-                  </div>
-                </div>
-              ))}
+        {availablePrompts.length > 0 && (
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Select Prompts
+            </label>
+            <div className="mb-2">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-slate-800/50 backdrop-blur-sm text-white border border-slate-700 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary"
+                placeholder="Search prompts..."
+              />
             </div>
-          ) : (
-            <p className="text-center p-4 text-slate-500">
-              {promptSearch ? "No prompts match your search." : "No prompts available."}
-            </p>
-          )}
-        </div>
-        
-        <p className="text-xs text-slate-500 mt-1">
-          Selected {selectedPromptIds.length} of {availablePrompts.length} prompts
-        </p>
+            <div className="max-h-60 overflow-y-auto p-2 bg-slate-800/30 rounded-md">
+              {filteredPrompts.length > 0 ? (
+                filteredPrompts.map(prompt => (
+                  <div 
+                    key={prompt._id} 
+                    className={`
+                      p-2 my-1 rounded cursor-pointer transition-colors flex items-center
+                      ${promptIds.includes(prompt._id) 
+                        ? 'bg-primary/20 border border-primary/30' 
+                        : 'hover:bg-slate-700/50 border border-transparent'
+                      }
+                    `}
+                    onClick={() => togglePromptSelection(prompt._id)}
+                  >
+                    <div className="flex-1">
+                      <div className="font-medium text-white">{prompt.content.split('\n')[0].substring(0, 25)}...</div>
+                    </div>
+                    <div className="ml-2">
+                      {promptIds.includes(prompt._id) ? (
+                        <svg className="text-primary" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M20 6 9 17l-5-5"></path>
+                        </svg>
+                      ) : (
+                        <svg className="text-gray-400" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <circle cx="12" cy="12" r="10"></circle>
+                        </svg>
+                      )}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center text-gray-400 py-4">
+                  No prompts match your search
+                </div>
+              )}
+            </div>
+            <div className="mt-2 text-sm text-gray-400">
+              Selected: {promptIds.length} of {availablePrompts.length} prompts
+            </div>
+          </div>
+        )}
       </div>
-      
-      <div className="flex justify-end gap-2 mt-4">
-        <button
-          type="button"
+      <div className="flex justify-end space-x-3 mt-6">
+        <button 
+          type="button" 
           onClick={onCancel}
-          className="bg-slate-200 dark:bg-slate-800 text-foreground rounded-md px-4 py-2"
+          className="btn-secondary"
         >
           Cancel
         </button>
-        <button
+        <button 
           type="submit"
-          className="bg-foreground text-background rounded-md px-4 py-2"
+          className="btn-primary"
         >
-          {collection ? "Save Changes" : "Create Collection"}
+          {name ? 'Update' : 'Create'}
         </button>
       </div>
     </form>
@@ -594,21 +690,32 @@ interface PromptCardProps {
   onSelect?: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  onTest?: (prompt: Prompt) => void;
 }
 
-function PromptCard({ prompt, isSelectable = false, isSelected = false, onSelect, onEdit, onDelete }: PromptCardProps) {
+function PromptCard({ prompt, isSelectable = false, isSelected = false, onSelect, onEdit, onDelete, onTest }: PromptCardProps) {
   const [showDropdown, setShowDropdown] = useState(false);
+  const [showExample, setShowExample] = useState(false);
+
+  // Get first line and truncate for preview
+  const contentPreview = prompt.content.split('\n')[0].substring(0, 30);
 
   return (
-    <div className={`bg-slate-200 dark:bg-slate-800 rounded-md p-4 flex flex-col ${isSelected ? 'ring-2 ring-blue-500' : ''}`}>
+    <div className={`glass-card gradient-border p-4 flex flex-col transition-all duration-200 hover:translate-y-[-2px] ${isSelected ? 'ring-2 ring-primary' : ''} ${isSelectable ? 'hover:ring-1 hover:ring-primary/30' : ''}`}>
       <div className="flex justify-between items-start mb-2">
-        <div className="flex items-center gap-2">
+        <div>
+          <h3 className="font-medium text-white">{contentPreview}...</h3>
+          <p className="text-xs text-gray-400">
+            {prompt.content.length > 60 ? prompt.content.substring(0, 60) + '...' : prompt.content}
+          </p>
+        </div>
+        <div className="relative">
           {isSelectable && (
             <button
               onClick={onSelect}
-              className="p-1 rounded-md hover:bg-slate-300 dark:hover:bg-slate-700"
+              className="p-1 rounded-md hover:bg-slate-700/50 transition-colors mr-2"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={isSelected ? 'text-primary' : 'text-gray-400'}>
                 {isSelected ? (
                   <>
                     <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"></path>
@@ -620,14 +727,11 @@ function PromptCard({ prompt, isSelectable = false, isSelected = false, onSelect
               </svg>
             </button>
           )}
-          <h3 className="font-medium">{prompt.title}</h3>
-        </div>
-        <div className="relative">
           <button 
             onClick={() => setShowDropdown(!showDropdown)}
-            className="p-1 rounded-md hover:bg-slate-300 dark:hover:bg-slate-700"
+            className="p-1 rounded-md hover:bg-slate-700/50 transition-colors"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400">
               <circle cx="12" cy="12" r="1"></circle>
               <circle cx="19" cy="12" r="1"></circle>
               <circle cx="5" cy="12" r="1"></circle>
@@ -635,16 +739,16 @@ function PromptCard({ prompt, isSelectable = false, isSelected = false, onSelect
           </button>
           
           {showDropdown && (
-            <div className="absolute right-0 mt-1 w-48 bg-background border border-slate-200 dark:border-slate-700 rounded-md shadow-lg z-10">
+            <div className="absolute right-0 mt-1 w-48 glass-card border border-card rounded-md shadow-lg z-10">
               <div className="py-1">
                 <button
                   onClick={() => {
                     onEdit();
                     setShowDropdown(false);
                   }}
-                  className="flex items-center w-full text-left px-4 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-700"
+                  className="flex items-center w-full text-left px-4 py-2 text-sm hover:bg-slate-700/50 transition-colors"
                 >
-                  <svg className="mr-2" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <svg className="mr-2 text-primary" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path>
                     <path d="m15 5 4 4"></path>
                   </svg>
@@ -655,14 +759,42 @@ function PromptCard({ prompt, isSelectable = false, isSelected = false, onSelect
                     onDelete();
                     setShowDropdown(false);
                   }}
-                  className="flex items-center w-full text-left px-4 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-700"
+                  className="flex items-center w-full text-left px-4 py-2 text-sm hover:bg-slate-700/50 transition-colors"
                 >
-                  <svg className="mr-2" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <svg className="mr-2 text-red-400" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M3 6h18"></path>
                     <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
                     <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
                   </svg>
                   Delete
+                </button>
+                {onTest && (
+                  <button
+                    onClick={() => {
+                      onTest(prompt);
+                      setShowDropdown(false);
+                    }}
+                    className="flex items-center w-full text-left px-4 py-2 text-sm hover:bg-slate-700/50 transition-colors"
+                  >
+                    <svg className="mr-2 text-green-400" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"></path>
+                      <path d="m9 12 2 2 4-4"></path>
+                    </svg>
+                    Test with AI
+                  </button>
+                )}
+                <button
+                  onClick={() => {
+                    setShowExample(!showExample);
+                    setShowDropdown(false);
+                  }}
+                  className="flex items-center w-full text-left px-4 py-2 text-sm hover:bg-slate-700/50 transition-colors"
+                >
+                  <svg className="mr-2 text-primary" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path>
+                    <circle cx="12" cy="12" r="3"></circle>
+                  </svg>
+                  View Example
                 </button>
               </div>
             </div>
@@ -670,13 +802,27 @@ function PromptCard({ prompt, isSelectable = false, isSelected = false, onSelect
         </div>
       </div>
       
-      <div className="flex-grow overflow-hidden">
-        <p className="text-sm text-slate-600 dark:text-slate-300 line-clamp-3">
-          {prompt.content}
-        </p>
+      <div className="flex-grow">
+        <div className="flex items-center mt-2">
+          <div className="w-4 h-4 rounded-full bg-gradient-to-r from-primary to-accent mr-2"></div>
+          <p className="text-sm font-medium text-gray-300">Content Length: <span className="text-primary">{prompt.content.length} chars</span></p>
+        </div>
+        
+        <div className="mt-3 space-y-2">
+          <p className="text-xs text-gray-400 line-clamp-3">
+            {prompt.content.split('\n').slice(0, 3).join('\n')}
+          </p>
+          
+          {showExample && (
+            <div className="mt-3 pt-3 border-t border-slate-700">
+              <p className="text-xs text-primary-light mb-1">Example output:</p>
+              <p className="text-xs text-gray-300 line-clamp-4">{prompt.example}</p>
+            </div>
+          )}
+        </div>
       </div>
       
-      <div className="mt-4 text-xs text-slate-500 dark:text-slate-400">
+      <div className="mt-4 text-xs text-gray-400">
         Created: {new Date(prompt.createdAt).toLocaleDateString()}
       </div>
     </div>
@@ -697,20 +843,20 @@ function CollectionCard({ collection, prompts, onEdit, onDelete, onRemovePrompt 
   const [showPrompts, setShowPrompts] = useState(false);
 
   return (
-    <div className="bg-slate-200 dark:bg-slate-800 rounded-md p-4 flex flex-col">
+    <div className="glass-card gradient-border p-4 flex flex-col transition-all duration-200 hover:translate-y-[-2px]">
       <div className="flex justify-between items-start mb-2">
         <div>
-          <h3 className="font-medium">{collection.name}</h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
+          <h3 className="font-medium text-white">{collection.name}</h3>
+          <p className="text-xs text-gray-400">
             {collection.description}
           </p>
         </div>
         <div className="relative">
           <button 
             onClick={() => setShowDropdown(!showDropdown)}
-            className="p-1 rounded-md hover:bg-slate-300 dark:hover:bg-slate-700"
+            className="p-1 rounded-md hover:bg-slate-700/50 transition-colors"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400">
               <circle cx="12" cy="12" r="1"></circle>
               <circle cx="19" cy="12" r="1"></circle>
               <circle cx="5" cy="12" r="1"></circle>
@@ -718,16 +864,16 @@ function CollectionCard({ collection, prompts, onEdit, onDelete, onRemovePrompt 
           </button>
           
           {showDropdown && (
-            <div className="absolute right-0 mt-1 w-48 bg-background border border-slate-200 dark:border-slate-700 rounded-md shadow-lg z-10">
+            <div className="absolute right-0 mt-1 w-48 glass-card border border-card rounded-md shadow-lg z-10">
               <div className="py-1">
                 <button
                   onClick={() => {
                     onEdit();
                     setShowDropdown(false);
                   }}
-                  className="flex items-center w-full text-left px-4 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-700"
+                  className="flex items-center w-full text-left px-4 py-2 text-sm hover:bg-slate-700/50 transition-colors"
                 >
-                  <svg className="mr-2" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <svg className="mr-2 text-primary" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path>
                     <path d="m15 5 4 4"></path>
                   </svg>
@@ -738,9 +884,9 @@ function CollectionCard({ collection, prompts, onEdit, onDelete, onRemovePrompt 
                     onDelete();
                     setShowDropdown(false);
                   }}
-                  className="flex items-center w-full text-left px-4 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-700"
+                  className="flex items-center w-full text-left px-4 py-2 text-sm hover:bg-slate-700/50 transition-colors"
                 >
-                  <svg className="mr-2" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <svg className="mr-2 text-red-400" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M3 6h18"></path>
                     <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
                     <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
@@ -752,9 +898,9 @@ function CollectionCard({ collection, prompts, onEdit, onDelete, onRemovePrompt 
                     setShowPrompts(true);
                     setShowDropdown(false);
                   }}
-                  className="flex items-center w-full text-left px-4 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-700"
+                  className="flex items-center w-full text-left px-4 py-2 text-sm hover:bg-slate-700/50 transition-colors"
                 >
-                  <svg className="mr-2" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <svg className="mr-2 text-primary" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M8 3H5a2 2 0 0 0-2 2v3"></path>
                     <path d="M21 8V5a2 2 0 0 0-2-2h-3"></path>
                     <path d="M3 16v3a2 2 0 0 0 2 2h3"></path>
@@ -767,17 +913,17 @@ function CollectionCard({ collection, prompts, onEdit, onDelete, onRemovePrompt 
           )}
           
           {showPrompts && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-              <div className="bg-background rounded-md p-6 max-w-md w-full">
-                <h3 className="text-lg font-medium mb-4">Prompts in {collection.name}</h3>
+            <div className="fixed inset-0 bg-black bg-opacity-70 backdrop-blur-sm flex items-center justify-center z-50">
+              <div className="glass-card gradient-border p-6 max-w-md w-full">
+                <h3 className="text-lg font-medium mb-4 text-white">Prompts in <span className="text-primary">{collection.name}</span></h3>
                 <div className="space-y-2 max-h-60 overflow-y-auto">
                   {prompts.length > 0 ? (
                     prompts.map(prompt => (
-                      <div key={prompt._id} className="p-2 rounded-md bg-slate-100 dark:bg-slate-800 flex justify-between items-center">
-                        <div className="truncate flex-1">{prompt.title}</div>
+                      <div key={prompt._id} className="glass-card p-2 flex justify-between items-center">
+                        <div className="truncate flex-1 text-white">{prompt.content.split('\n')[0].substring(0, 25)}...</div>
                         <button
                           onClick={() => onRemovePrompt(collection._id, prompt._id)}
-                          className="ml-2 p-1 rounded-md hover:bg-slate-200 dark:hover:bg-slate-700"
+                          className="ml-2 p-1 rounded-md hover:bg-slate-700/50 text-gray-400 hover:text-red-400 transition-colors"
                         >
                           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                             <path d="M18 6 6 18"></path>
@@ -787,13 +933,13 @@ function CollectionCard({ collection, prompts, onEdit, onDelete, onRemovePrompt 
                       </div>
                     ))
                   ) : (
-                    <p className="text-center text-slate-500">No prompts in this collection</p>
+                    <p className="text-center text-gray-400">No prompts in this collection</p>
                   )}
                 </div>
                 <div className="flex justify-end mt-4">
                   <button
                     onClick={() => setShowPrompts(false)}
-                    className="bg-slate-200 dark:bg-slate-800 text-foreground rounded-md px-4 py-2"
+                    className="btn-secondary"
                   >
                     Close
                   </button>
@@ -805,28 +951,34 @@ function CollectionCard({ collection, prompts, onEdit, onDelete, onRemovePrompt 
       </div>
       
       <div className="flex-grow">
-        <p className="text-sm font-medium mt-2">Prompts: {collection.promptIds.length}</p>
+        <div className="flex items-center mt-2">
+          <div className="w-4 h-4 rounded-full bg-gradient-to-r from-primary to-accent mr-2"></div>
+          <p className="text-sm font-medium text-gray-300">Prompts: <span className="text-primary">{collection.promptIds.length}</span></p>
+        </div>
         {prompts.length > 0 ? (
-          <ul className="mt-1 space-y-1">
+          <ul className="mt-3 space-y-2">
             {prompts.slice(0, 3).map(prompt => (
-              <li key={prompt._id} className="text-xs text-slate-500 dark:text-slate-400 truncate">
-                • {prompt.title}
+              <li key={prompt._id} className="text-xs text-gray-400 truncate flex items-center">
+                <svg className="mr-1 text-primary-light" xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                </svg>
+                {prompt.content.split('\n')[0].substring(0, 25)}...
               </li>
             ))}
             {prompts.length > 3 && (
-              <li className="text-xs text-slate-500 dark:text-slate-400">
+              <li className="text-xs text-primary">
                 + {prompts.length - 3} more
               </li>
             )}
           </ul>
         ) : (
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+          <p className="text-xs text-gray-400 mt-3">
             No prompts in this collection
           </p>
         )}
       </div>
       
-      <div className="mt-4 text-xs text-slate-500 dark:text-slate-400">
+      <div className="mt-4 text-xs text-gray-400">
         Created: {new Date(collection.createdAt).toLocaleDateString()}
       </div>
     </div>

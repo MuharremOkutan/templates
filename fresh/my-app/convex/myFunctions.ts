@@ -22,10 +22,25 @@ export const listNumbers = query({
       // Ordered by _creationTime, return most recent
       .order("desc")
       .take(args.count);
-    const userId = await getAuthUserId(ctx);
-    const user = userId === null ? null : await ctx.db.get(userId);
+    
+    // Try to get authenticated user
+    let viewer = null;
+    try {
+      const userId = await getAuthUserId(ctx);
+      if (userId) {
+        const user = await ctx.db.get(userId);
+        if (user) {
+          // Try email first, then fallback to tokenIdentifier if available
+          viewer = user.email || 
+            (user.tokenIdentifier ? user.tokenIdentifier.split("|")[0] : null);
+        }
+      }
+    } catch (error) {
+      console.error("Error getting user:", error);
+    }
+    
     return {
-      viewer: user?.email ?? null,
+      viewer,
       numbers: numbers.reverse().map((number) => number.value),
     };
   },

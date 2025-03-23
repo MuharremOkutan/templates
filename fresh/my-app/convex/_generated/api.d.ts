@@ -14,8 +14,12 @@ import type {
   FunctionReference,
 } from "convex/server";
 import type * as auth from "../auth.js";
+import type * as authUtils from "../authUtils.js";
+import type * as businessContextFunctions from "../businessContextFunctions.js";
 import type * as http from "../http.js";
 import type * as myFunctions from "../myFunctions.js";
+import type * as news from "../news.js";
+import type * as openai from "../openai.js";
 import type * as promptFunctions from "../promptFunctions.js";
 
 /**
@@ -28,8 +32,12 @@ import type * as promptFunctions from "../promptFunctions.js";
  */
 declare const fullApi: ApiFromModules<{
   auth: typeof auth;
+  authUtils: typeof authUtils;
+  businessContextFunctions: typeof businessContextFunctions;
   http: typeof http;
   myFunctions: typeof myFunctions;
+  news: typeof news;
+  openai: typeof openai;
   promptFunctions: typeof promptFunctions;
 }>;
 export declare const api: FilterApi<

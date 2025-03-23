@@ -1,0 +1,1 @@
+{"root":["./auth.config.ts","./auth.ts","./authutils.ts","./businesscontextfunctions.ts","./http.ts","./myfunctions.ts","./openai.ts","./promptfunctions.ts","./schema.ts"],"version":"5.8.2"}

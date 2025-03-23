@@ -5,6 +5,7 @@
     "bun-types": "^1.1.25"
   },
   "dependencies": {
-    "lucide-react": "^0.483.0"
+    "lucide-react": "^0.483.0",
+    "react-error-boundary": "^5.0.0"
   }
 }
