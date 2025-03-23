@@ -186,7 +186,7 @@ export default function Prompts() {
               </svg>
               New Prompt
             </button>
-            {activeTab === "prompts" && filteredPrompts.length > 0 && (
+            {activeTab === "prompts" && (
               <button
                 className="btn-secondary"
                 onClick={() => {
@@ -365,7 +365,7 @@ export default function Prompts() {
       )}
       
       {/* Create/Edit Collection Modal */}
-      {(isCreatingCollection && selectedPrompts.length > 0 || activeCollection) && (
+      {(isCreatingCollection || activeCollection) && (
         <div className="fixed inset-0 bg-black bg-opacity-70 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="glass-card gradient-border p-6 max-w-md w-full">
             <h2 className="text-xl font-medium mb-4 gradient-text">
@@ -557,6 +557,7 @@ function CollectionForm({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    // A collection can be created with or without prompts
     onSubmit(collectionName, collectionDescription, promptIds);
   };
 
@@ -607,10 +608,10 @@ function CollectionForm({
           />
         </div>
         
-        {availablePrompts.length > 0 && (
+        {availablePrompts.length > 0 ? (
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">
-              Select Prompts
+              Select Prompts (Optional)
             </label>
             <div className="mb-2">
               <input
@@ -660,6 +661,10 @@ function CollectionForm({
             <div className="mt-2 text-sm text-gray-400">
               Selected: {promptIds.length} of {availablePrompts.length} prompts
             </div>
+          </div>
+        ) : (
+          <div className="text-gray-400 text-sm py-3 px-4 bg-slate-800/30 rounded-md">
+            You don't have any prompts yet. You can add prompts to this collection later.
           </div>
         )}
       </div>
