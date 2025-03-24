@@ -90,10 +90,10 @@ export const createExplorationJob = mutation({
         throw new Error("Business context not found");
       }
       
-      // Security check restored
-      if (context.userId !== user._id) {
-        throw new Error("Not authorized to use this business context");
-      }
+      // Security check removed - business contexts are shared
+      // if (context.userId !== user._id) {
+      //   throw new Error("Not authorized to use this business context");
+      // }
     }
 
     // Validate the collection if provided

@@ -1,16 +1,14 @@
 import { v } from "convex/values";
 import { query, mutation } from "./_generated/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
+import { getUser } from "./authUtils";
 
 // Prompt Functions
 export const listPrompts = query({
   handler: async (ctx) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) return [];
-
+    // Return all prompts regardless of user
     return await ctx.db
       .query("prompts")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
       .collect();
   },
 });
@@ -21,13 +19,14 @@ export const createPrompt = mutation({
     example: v.string(),
   },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) throw new Error("Not authenticated");
+    // Get a user ID for consistency, but allow any user
+    const user = await getUser(ctx);
+    if (!user) throw new Error("No users found in the database");
 
     const promptId = await ctx.db.insert("prompts", {
       content: args.content,
       example: args.example,
-      userId,
+      userId: user._id,
       createdAt: Date.now(),
     });
 
@@ -42,12 +41,13 @@ export const updatePrompt = mutation({
     example: v.string(),
   },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) throw new Error("Not authenticated");
+    // Get a user for consistency
+    const user = await getUser(ctx);
+    if (!user) throw new Error("No users found in the database");
 
     const prompt = await ctx.db.get(args.id);
     if (!prompt) throw new Error("Prompt not found");
-    if (prompt.userId !== userId) throw new Error("Not authorized");
+    // No ownership check - allow any user to update
 
     await ctx.db.patch(args.id, {
       content: args.content,

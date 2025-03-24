@@ -1,42 +1,43 @@
 import * as React from "react";
 
-interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
+interface CardProps {
   className?: string;
+  children: React.ReactNode;
 }
 
-export function Card({ className, ...props }: CardProps) {
+export function Card({ className = "", children }: CardProps) {
   return (
-    <div
-      className={`rounded-lg border border-gray-700 bg-gray-800/30 shadow ${className || ""}`}
-      {...props}
-    />
+    <div className={`rounded-lg border border-gray-700 bg-gray-900/60 shadow-sm ${className}`}>
+      {children}
+    </div>
   );
 }
 
-interface CardHeaderProps extends React.HTMLAttributes<HTMLDivElement> {
+interface CardHeaderProps {
   className?: string;
+  children: React.ReactNode;
 }
 
-export function CardHeader({ className, ...props }: CardHeaderProps) {
-  return (
-    <div
-      className={`flex flex-col space-y-1.5 p-4 ${className || ""}`}
-      {...props}
-    />
-  );
+export function CardHeader({ className = "", children }: CardHeaderProps) {
+  return <div className={`p-6 ${className}`}>{children}</div>;
 }
 
-interface CardTitleProps extends React.HTMLAttributes<HTMLHeadingElement> {
+interface CardTitleProps {
   className?: string;
+  children: React.ReactNode;
 }
 
-export function CardTitle({ className, ...props }: CardTitleProps) {
-  return (
-    <h3
-      className={`font-semibold leading-none tracking-tight ${className || ""}`}
-      {...props}
-    />
-  );
+export function CardTitle({ className = "", children }: CardTitleProps) {
+  return <h3 className={`text-lg font-semibold ${className}`}>{children}</h3>;
+}
+
+interface CardContentProps {
+  className?: string;
+  children: React.ReactNode;
+}
+
+export function CardContent({ className = "", children }: CardContentProps) {
+  return <div className={`p-6 pt-0 ${className}`}>{children}</div>;
 }
 
 interface CardDescriptionProps extends React.HTMLAttributes<HTMLParagraphElement> {
@@ -47,19 +48,6 @@ export function CardDescription({ className, ...props }: CardDescriptionProps) {
   return (
     <p
       className={`text-sm text-gray-400 ${className || ""}`}
-      {...props}
-    />
-  );
-}
-
-interface CardContentProps extends React.HTMLAttributes<HTMLDivElement> {
-  className?: string;
-}
-
-export function CardContent({ className, ...props }: CardContentProps) {
-  return (
-    <div
-      className={`p-4 pt-0 ${className || ""}`}
       {...props}
     />
   );

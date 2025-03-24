@@ -3,19 +3,13 @@ import { query, mutation } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
 import { getUser } from "./authUtils";
 
-// List all business contexts for the authenticated user
+// List all business contexts for all users
 export const listBusinessContexts = query({
   args: {},
   handler: async (ctx) => {
-    const user = await getUser(ctx);
-    if (!user) {
-      throw new Error("Not authenticated");
-    }
-
-    // Query all business contexts for the current user
+    // Simplified: No user check, return all business contexts
     const contexts = await ctx.db
       .query("businessContexts")
-      .withIndex("by_user", (q) => q.eq("userId", user._id))
       .collect();
 
     return contexts;
@@ -28,20 +22,13 @@ export const getBusinessContext = query({
     id: v.id("businessContexts"),
   },
   handler: async (ctx, { id }) => {
-    const user = await getUser(ctx);
-    if (!user) {
-      throw new Error("Not authenticated");
-    }
-
     const context = await ctx.db.get(id);
     
     if (!context) {
       throw new Error("Business context not found");
     }
     
-    if (context.userId !== user._id) {
-      throw new Error("You don't have permission to view this business context");
-    }
+    // No user ownership check
 
     return context;
   },
@@ -56,7 +43,7 @@ export const createBusinessContext = mutation({
   handler: async (ctx, { title, description }) => {
     const user = await getUser(ctx);
     if (!user) {
-      throw new Error("Not authenticated");
+      throw new Error("No users found in the database");
     }
 
     const now = Date.now();
@@ -65,7 +52,7 @@ export const createBusinessContext = mutation({
     const id = await ctx.db.insert("businessContexts", {
       title,
       description,
-      userId: user._id,
+      userId: user._id, // Still assign to a user for database consistency
       createdAt: now,
       updatedAt: now,
     });
@@ -82,20 +69,19 @@ export const updateBusinessContext = mutation({
     description: v.string(),
   },
   handler: async (ctx, { id, title, description }) => {
+    // Get user for database consistency, but don't restrict based on ownership
     const user = await getUser(ctx);
     if (!user) {
-      throw new Error("Not authenticated");
+      throw new Error("No users found in the database");
     }
 
-    // Check if the context exists and belongs to the user
+    // Check if the context exists
     const existingContext = await ctx.db.get(id);
     if (!existingContext) {
       throw new Error("Business context not found");
     }
 
-    if (existingContext.userId !== user._id) {
-      throw new Error("You don't have permission to edit this business context");
-    }
+    // No ownership check - anyone can edit
 
     // Update the context
     await ctx.db.patch(id, {
@@ -114,20 +100,19 @@ export const deleteBusinessContext = mutation({
     id: v.id("businessContexts"),
   },
   handler: async (ctx, { id }) => {
+    // Get user for database consistency, but don't restrict based on ownership
     const user = await getUser(ctx);
     if (!user) {
-      throw new Error("Not authenticated");
+      throw new Error("No users found in the database");
     }
 
-    // Check if the context exists and belongs to the user
+    // Check if the context exists
     const existingContext = await ctx.db.get(id);
     if (!existingContext) {
       throw new Error("Business context not found");
     }
 
-    if (existingContext.userId !== user._id) {
-      throw new Error("You don't have permission to delete this business context");
-    }
+    // No ownership check - anyone can delete
 
     // Delete the context
     await ctx.db.delete(id);

@@ -5,38 +5,16 @@ import { api } from "./_generated/api";
 
 /**
  * Get the user from the provided context
- * Check if the user exists and is authenticated
+ * Modified to return the first user for all operations - all data is shared
  * @param ctx Query, Mutation, or Action context
- * @returns The user document or null if not authenticated
+ * @returns The first user document
  */
 export async function getUser(ctx: QueryCtx | MutationCtx) {
-  // Get the user ID from the auth rule
-  const identity = await ctx.auth.getUserIdentity();
-  if (!identity) {
-    console.warn("No identity found in auth context");
-    // DEBUG: For testing, create a fake user identity
-    // REMOVE THIS IN PRODUCTION
-    return await ctx.db
-      .query("users")
-      .first();
-  }
-
-  // Check if we've stored this identity before (should have an associated user document for the given token)
-  const user = await ctx.db
+  // Return the first user from the database
+  // This makes all data visible to all users
+  return await ctx.db
     .query("users")
-    .withIndex("by_token", (q) => q.eq("tokenIdentifier", identity.tokenIdentifier))
     .first();
-
-  if (!user) {
-    console.warn(`User not found with tokenIdentifier: ${identity.tokenIdentifier}`);
-    // DEBUG: For testing, return first user if no match found
-    // REMOVE THIS IN PRODUCTION
-    return await ctx.db
-      .query("users")
-      .first();
-  }
-
-  return user;
 }
 
 /**
@@ -48,7 +26,7 @@ export async function getUser(ctx: QueryCtx | MutationCtx) {
 export async function assertUser(ctx: QueryCtx | MutationCtx) {
   const user = await getUser(ctx);
   if (!user) {
-    throw new Error("Not authenticated");
+    throw new Error("No users found in the database");
   }
   return user;
 }
@@ -60,45 +38,22 @@ export async function getUserFromContext(ctx: QueryCtx | MutationCtx) {
 
 // Action context variant
 export async function getUserFromAction(ctx: ActionCtx) {
-  const identity = await ctx.auth.getUserIdentity();
-  if (!identity) {
-    return null;
-  }
-
   try {
-    // Check if we've stored this identity before
-    const tokenIdentifier = identity.tokenIdentifier;
-    
-    // Use the proper function reference syntax
+    // Use the first user for all operations
     const user = await ctx.runQuery(api.auth.getUserByToken, { 
-      tokenIdentifier, 
-      email: identity.email 
+      tokenIdentifier: "shared_access", 
+      email: "shared@example.com" 
     });
     
     if (!user) {
-      console.warn(`User not found for token: ${tokenIdentifier}`);
-      
-      // Try to create a new user if none exists
-      try {
-        const name = identity.name || identity.email?.split('@')[0] || "User";
-        const email = identity.email;
-        
-        const userId = await ctx.runMutation(api.auth.createNewUser, {
-          tokenIdentifier,
-          email,
-          name
-        });
-        
-        // Fetch the new user
-        if (userId) {
-          const newUser = await ctx.runQuery(api.auth.getUserById, { id: userId });
-          return newUser;
-        }
-        return null;
-      } catch (createError) {
-        console.error("Error creating user:", createError);
-        return null;
+      // If no user exists yet, try to get any user
+      const firstUser = await ctx.runQuery(api.myFunctions.listNumbers, { count: 1 });
+      if (firstUser && firstUser.viewer) {
+        return firstUser.viewer;
       }
+      
+      console.warn("No users found in the database");
+      return null;
     }
     
     return user;
