@@ -20,6 +20,8 @@ import React, { Component, ErrorInfo, ReactNode } from "react";
 import News from "./News";
 import NewsDetail from "./NewsDetail";
 import Exploration from "./Exploration";
+import Leads from "./Leads";
+import LeadDetail from "./LeadDetail";
 
 // Define a simple error boundary component
 class SimpleErrorBoundary extends Component<{ children: ReactNode }> {
@@ -113,6 +115,12 @@ export default function App() {
                   className="font-medium text-gray-300 hover:text-white transition-colors relative after:absolute after:bottom-0 after:left-0 after:h-[2px] after:w-0 after:bg-primary after:transition-all hover:after:w-full"
                 >
                   News
+                </Link>
+                <Link
+                  to="/leads"
+                  className="font-medium text-gray-300 hover:text-white transition-colors relative after:absolute after:bottom-0 after:left-0 after:h-[2px] after:w-0 after:bg-primary after:transition-all hover:after:w-full"
+                >
+                  Leads
                 </Link>
               </nav>
             </div>
@@ -250,6 +258,37 @@ export default function App() {
                 <Unauthenticated>
                   <div className="glass-card p-8 flex flex-col items-center justify-center">
                     <p className="mb-4 text-gray-300">Please sign in to view news details</p>
+                    <SignInForm />
+                  </div>
+                </Unauthenticated>
+              </>
+            } />
+            <Route path="/leads" element={
+              <>
+                <h1 className="text-2xl font-bold mb-6 gradient-text">Lead Management</h1>
+                <Authenticated>
+                  <SimpleErrorBoundary>
+                    <Leads />
+                  </SimpleErrorBoundary>
+                </Authenticated>
+                <Unauthenticated>
+                  <div className="glass-card p-8 flex flex-col items-center justify-center">
+                    <p className="mb-4 text-gray-300">Please sign in to manage your leads</p>
+                    <SignInForm />
+                  </div>
+                </Unauthenticated>
+              </>
+            } />
+            <Route path="/lead/:id" element={
+              <>
+                <Authenticated>
+                  <SimpleErrorBoundary>
+                    <LeadDetail />
+                  </SimpleErrorBoundary>
+                </Authenticated>
+                <Unauthenticated>
+                  <div className="glass-card p-8 flex flex-col items-center justify-center">
+                    <p className="mb-4 text-gray-300">Please sign in to view lead details</p>
                     <SignInForm />
                   </div>
                 </Unauthenticated>

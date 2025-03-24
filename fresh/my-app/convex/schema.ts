@@ -88,7 +88,7 @@ export default defineSchema({
     startDate: v.optional(v.string()), // ISO date string
     endDate: v.optional(v.string()), // ISO date string
     scheduleDays: v.array(v.number()), // 0-6 (Sunday-Saturday)
-    scheduleHours: v.array(v.number()), // 0-23
+    scheduleHours: v.array(v.number()), // Hours to run
     lastRun: v.optional(v.number()), // timestamp
     status: v.optional(v.string()), // "pending", "running", "completed", "failed"
     userId: v.id("users"),

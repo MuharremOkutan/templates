@@ -1,3 +1,22 @@
+# Convex Functions Directory
+
+## Exploration Job System
+
+The Exploration Job system allows users to schedule regular analysis of news articles using business contexts and prompt collections. To initialize the system after deployment, run the following command in the Convex console:
+
+```
+await mutation("explorationFunctions:initializeExplorationSystem", {});
+```
+
+This will set up the hourly scheduler to check for jobs that need to be run. 
+
+The system includes:
+- Job creation with selectable business contexts and prompt collections
+- Scheduled execution based on specified days and times
+- Automatic processing of news articles within the specified date range
+
+---
+
 # Welcome to your Convex functions directory!
 
 Write your Convex functions here.
