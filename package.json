@@ -5,7 +5,11 @@
     "bun-types": "^1.1.25"
   },
   "dependencies": {
+    "@radix-ui/react-toast": "^1.2.6",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
     "lucide-react": "^0.483.0",
-    "react-error-boundary": "^5.0.0"
+    "react-error-boundary": "^5.0.0",
+    "tailwind-merge": "^3.0.2"
   }
 }

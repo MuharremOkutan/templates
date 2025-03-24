@@ -1,5 +1,5 @@
 // LeadDetail.tsx
-import React from "react";
+import React, { useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { Avatar, AvatarFallback, AvatarImage } from "./components/ui/avatar";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from "./components/ui/card";
@@ -7,6 +7,7 @@ import { Badge } from "./components/ui/badge";
 import { Button } from "./components/ui/button";
 import { LeadProgress } from "./components/LeadProgress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/tabs";
+import { toast } from "./components/ui/use-toast";
 
 // Sample lead data
 const leadsData = [
@@ -152,9 +153,9 @@ const getRecentActivities = (leadName: string) => [
 
 export default function LeadDetail() {
   const { id } = useParams<{ id: string }>();
-  const lead = leadsData.find(lead => lead.id === id);
+  const [leadData, setLeadData] = useState(leadsData.find(lead => lead.id === id));
   
-  if (!lead) {
+  if (!leadData) {
     return (
       <div className="glass-card p-8 text-center">
         <h3 className="text-xl font-medium mb-4 text-white">Lead Not Found</h3>
@@ -170,30 +171,47 @@ export default function LeadDetail() {
     );
   }
   
-  const relatedArticles = getRelatedArticles(lead.company, lead.job);
-  const recentActivities = getRecentActivities(lead.name);
+  const relatedArticles = getRelatedArticles(leadData.company, leadData.job);
+  const recentActivities = getRecentActivities(leadData.name);
+  
+  // Handle status change
+  const handleStatusChange = (newStatus: string) => {
+    // Update the lead data with the new status
+    const updatedLead = { ...leadData, status: newStatus };
+    
+    // Update local state
+    setLeadData(updatedLead);
+    
+    // In a real application, you would also update the backend here
+    // For demo purposes, show a toast notification
+    toast({
+      title: "Lead Status Updated",
+      description: `Lead status changed to ${newStatus}`,
+      variant: "success",
+    });
+  };
   
   // Track the progress stages
   const trackingSteps = [
     {
       name: "Initiated",
-      timestamp: lead.status === "Initiated" ? "Current Stage" : lead.status === "Assigned" || lead.status === "Engaged" || lead.status === "Done" ? "Completed" : "Not Started",
-      isCompleted: ["Initiated", "Assigned", "Engaged", "Done"].includes(lead.status)
+      timestamp: leadData.status === "Initiated" ? "Current Stage" : leadData.status === "Assigned" || leadData.status === "Engaged" || leadData.status === "Done" ? "Completed" : "Not Started",
+      isCompleted: ["Initiated", "Assigned", "Engaged", "Done"].includes(leadData.status)
     },
     {
       name: "Assigned",
-      timestamp: lead.status === "Assigned" ? "Current Stage" : lead.status === "Engaged" || lead.status === "Done" ? "Completed" : "Not Started",
-      isCompleted: ["Assigned", "Engaged", "Done"].includes(lead.status)
+      timestamp: leadData.status === "Assigned" ? "Current Stage" : leadData.status === "Engaged" || leadData.status === "Done" ? "Completed" : "Not Started",
+      isCompleted: ["Assigned", "Engaged", "Done"].includes(leadData.status)
     },
     {
       name: "Engaged",
-      timestamp: lead.status === "Engaged" ? "Current Stage" : lead.status === "Done" ? "Completed" : "Not Started",
-      isCompleted: ["Engaged", "Done"].includes(lead.status)
+      timestamp: leadData.status === "Engaged" ? "Current Stage" : leadData.status === "Done" ? "Completed" : "Not Started",
+      isCompleted: ["Engaged", "Done"].includes(leadData.status)
     },
     {
       name: "Done",
-      timestamp: lead.status === "Done" ? "Current Stage" : "Not Started",
-      isCompleted: ["Done"].includes(lead.status)
+      timestamp: leadData.status === "Done" ? "Current Stage" : "Not Started",
+      isCompleted: ["Done"].includes(leadData.status)
     }
   ];
 
@@ -231,25 +249,25 @@ export default function LeadDetail() {
             <div className="flex justify-between items-start">
               <div>
                 <Badge className={`mb-2 ${
-                  lead.status === "Done" ? "bg-green-900/50 text-green-400 border-green-800" :
-                  lead.status === "Engaged" ? "bg-blue-900/50 text-blue-400 border-blue-800" :
-                  lead.status === "Assigned" ? "bg-yellow-900/50 text-yellow-400 border-yellow-800" :
+                  leadData.status === "Done" ? "bg-green-900/50 text-green-400 border-green-800" :
+                  leadData.status === "Engaged" ? "bg-blue-900/50 text-blue-400 border-blue-800" :
+                  leadData.status === "Assigned" ? "bg-yellow-900/50 text-yellow-400 border-yellow-800" :
                   "bg-gray-900/50 text-gray-400 border-gray-800"
                 }`}>
-                  {lead.status}
+                  {leadData.status}
                 </Badge>
-                <CardTitle className="text-white">{lead.name}</CardTitle>
+                <CardTitle className="text-white">{leadData.name}</CardTitle>
                 <p className="text-sm text-gray-400 flex items-center mt-1">
                   <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
                   </svg>
-                  {lead.company} • {lead.position}
+                  {leadData.company} • {leadData.position}
                 </p>
               </div>
               <Avatar className="h-14 w-14">
-                <AvatarImage src={lead.avatar} alt={lead.name} />
+                <AvatarImage src={leadData.avatar} alt={leadData.name} />
                 <AvatarFallback className="bg-gray-800 text-primary">
-                  {lead.name.charAt(0)}
+                  {leadData.name.charAt(0)}
                 </AvatarFallback>
               </Avatar>
             </div>
@@ -260,39 +278,39 @@ export default function LeadDetail() {
                 <svg className="w-4 h-4 mr-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
                 </svg>
-                <span>{lead.email}</span>
+                <span>{leadData.email}</span>
               </div>
               <div className="flex items-center text-sm text-gray-300">
                 <svg className="w-4 h-4 mr-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"></path>
                 </svg>
-                <span>{lead.phone}</span>
+                <span>{leadData.phone}</span>
               </div>
               <div className="flex items-center text-sm text-gray-300">
                 <svg className="w-4 h-4 mr-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
                 </svg>
-                <span>{lead.location}</span>
+                <span>{leadData.location}</span>
               </div>
               <div className="flex items-center text-sm text-gray-300">
                 <svg className="w-4 h-4 mr-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
                 </svg>
-                <span>Added on {new Date(lead.date).toLocaleDateString()}</span>
+                <span>Added on {new Date(leadData.date).toLocaleDateString()}</span>
               </div>
               <div className="flex items-center text-sm text-gray-300">
                 <svg className="w-4 h-4 mr-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                 </svg>
-                <span>Last contacted {lead.lastContact}</span>
+                <span>Last contacted {leadData.lastContact}</span>
               </div>
             </div>
             
             <div className="pt-4 border-t border-gray-700">
               <h4 className="text-sm font-medium mb-2 text-gray-300">Lead Value</h4>
               <div className="flex items-center justify-between">
-                <span className="text-2xl font-bold text-white">${lead.value.toLocaleString()}</span>
+                <span className="text-2xl font-bold text-white">${leadData.value.toLocaleString()}</span>
                 <Badge variant="outline" className="text-xs border-gray-700 text-gray-300">
                   <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"></path>
@@ -302,10 +320,10 @@ export default function LeadDetail() {
               </div>
             </div>
 
-            {lead.notes && (
+            {leadData.notes && (
               <div className="pt-4 border-t border-gray-700">
                 <h4 className="text-sm font-medium mb-2 text-gray-300">Notes</h4>
-                <p className="text-sm text-gray-400">{lead.notes}</p>
+                <p className="text-sm text-gray-400">{leadData.notes}</p>
               </div>
             )}
           </CardContent>
@@ -339,7 +357,10 @@ export default function LeadDetail() {
               <CardDescription className="text-gray-400">Track the current progress of this lead through the sales pipeline</CardDescription>
             </CardHeader>
             <CardContent>
-              <LeadProgress currentStatus={lead.status} />
+              <LeadProgress 
+                currentStatus={leadData.status} 
+                onStatusChange={handleStatusChange}
+              />
             </CardContent>
           </Card>
 
@@ -362,26 +383,26 @@ export default function LeadDetail() {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="bg-gray-800/30 p-4 rounded-md border border-gray-700">
                           <h3 className="text-sm font-medium text-gray-400 mb-1">Job Type</h3>
-                          <p className="text-gray-300">{lead.job}</p>
+                          <p className="text-gray-300">{leadData.job}</p>
                         </div>
                         <div className="bg-gray-800/30 p-4 rounded-md border border-gray-700">
                           <h3 className="text-sm font-medium text-gray-400 mb-1">Current State</h3>
-                          <p className="text-gray-300">{lead.jobState}</p>
+                          <p className="text-gray-300">{leadData.jobState}</p>
                         </div>
                         <div className="bg-gray-800/30 p-4 rounded-md border border-gray-700">
                           <h3 className="text-sm font-medium text-gray-400 mb-1">Start Date</h3>
-                          <p className="text-gray-300">{new Date(lead.date).toLocaleDateString()}</p>
+                          <p className="text-gray-300">{new Date(leadData.date).toLocaleDateString()}</p>
                         </div>
                         <div className="bg-gray-800/30 p-4 rounded-md border border-gray-700">
                           <h3 className="text-sm font-medium text-gray-400 mb-1">Estimated Value</h3>
-                          <p className="text-gray-300">${lead.value.toLocaleString()}</p>
+                          <p className="text-gray-300">${leadData.value.toLocaleString()}</p>
                         </div>
                       </div>
                       
                       <div className="space-y-2">
                         <h3 className="text-sm font-medium text-gray-400">Requirements</h3>
                         <p className="text-gray-300 bg-gray-800/30 p-4 rounded-md border border-gray-700">
-                          This lead requires a {lead.job} solution. {lead.notes}
+                          This lead requires a {leadData.job} solution. {leadData.notes}
                         </p>
                       </div>
                     </CardContent>

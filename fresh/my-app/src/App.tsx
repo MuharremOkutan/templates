@@ -20,8 +20,11 @@ import React, { Component, ErrorInfo, ReactNode } from "react";
 import News from "./News";
 import NewsDetail from "./NewsDetail";
 import Exploration from "./Exploration";
+import ExplorationView from "./ExplorationView";
+import ExplorationEdit from "./ExplorationEdit";
 import Leads from "./Leads";
 import LeadDetail from "./LeadDetail";
+import { Toaster } from "./components/ui/toaster";
 
 // Define a simple error boundary component
 class SimpleErrorBoundary extends Component<{ children: ReactNode }> {
@@ -172,6 +175,51 @@ export default function App() {
                 <Unauthenticated>
                   <div className="glass-card p-8 flex flex-col items-center justify-center">
                     <p className="mb-4 text-gray-300">Please sign in to access exploration tools</p>
+                    <SignInForm />
+                  </div>
+                </Unauthenticated>
+              </>
+            } />
+            <Route path="/exploration/:id" element={
+              <>
+                <Authenticated>
+                  <SimpleErrorBoundary>
+                    <ExplorationView />
+                  </SimpleErrorBoundary>
+                </Authenticated>
+                <Unauthenticated>
+                  <div className="glass-card p-8 flex flex-col items-center justify-center">
+                    <p className="mb-4 text-gray-300">Please sign in to view exploration details</p>
+                    <SignInForm />
+                  </div>
+                </Unauthenticated>
+              </>
+            } />
+            <Route path="/exploration/create" element={
+              <>
+                <Authenticated>
+                  <SimpleErrorBoundary>
+                    <ExplorationEdit />
+                  </SimpleErrorBoundary>
+                </Authenticated>
+                <Unauthenticated>
+                  <div className="glass-card p-8 flex flex-col items-center justify-center">
+                    <p className="mb-4 text-gray-300">Please sign in to create explorations</p>
+                    <SignInForm />
+                  </div>
+                </Unauthenticated>
+              </>
+            } />
+            <Route path="/exploration/:id/edit" element={
+              <>
+                <Authenticated>
+                  <SimpleErrorBoundary>
+                    <ExplorationEdit />
+                  </SimpleErrorBoundary>
+                </Authenticated>
+                <Unauthenticated>
+                  <div className="glass-card p-8 flex flex-col items-center justify-center">
+                    <p className="mb-4 text-gray-300">Please sign in to edit explorations</p>
                     <SignInForm />
                   </div>
                 </Unauthenticated>
@@ -328,6 +376,9 @@ export default function App() {
             </p>
           </div>
         </footer>
+        
+        {/* Toast notifications */}
+        <Toaster />
       </div>
     </Router>
   );

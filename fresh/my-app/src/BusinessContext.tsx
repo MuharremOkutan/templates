@@ -3,6 +3,66 @@ import { Link } from "react-router-dom";
 import { useQuery, useMutation, useConvex } from "convex/react";
 import { api } from "../convex/_generated/api";
 import { Id } from "../convex/_generated/dataModel";
+import {
+  Button,
+  IconButton,
+  GlassCard,
+  GlassCardHeader,
+  GlassCardContent,
+  GlassCardFooter,
+  Input,
+  Skeleton,
+  SkeletonCard
+} from "./components";
+
+// Icons
+const PlusIcon = ({ className = "" }: { className?: string }) => (
+  <svg className={`w-5 h-5 ${className}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+  </svg>
+);
+
+const EditIcon = ({ className = "" }: { className?: string }) => (
+  <svg className={`w-4 h-4 ${className}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+  </svg>
+);
+
+const DeleteIcon = ({ className = "" }: { className?: string }) => (
+  <svg className={`w-4 h-4 ${className}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+  </svg>
+);
+
+const CalendarIcon = ({ className = "" }: { className?: string }) => (
+  <svg className={`w-3.5 h-3.5 ${className}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+  </svg>
+);
+
+const SearchIcon = ({ className = "" }: { className?: string }) => (
+  <svg className={`w-5 h-5 ${className}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+  </svg>
+);
+
+const ArrowRightIcon = ({ className = "" }: { className?: string }) => (
+  <svg className={`w-4 h-4 ${className}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+  </svg>
+);
+
+const EmptyDocIcon = ({ className = "" }: { className?: string }) => (
+  <svg className={`w-16 h-16 ${className}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+  </svg>
+);
+
+const SearchResultIcon = ({ className = "" }: { className?: string }) => (
+  <svg className={`w-16 h-16 ${className}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+  </svg>
+);
 
 type BusinessContext = {
   _id: Id<"businessContexts">;
@@ -26,6 +86,7 @@ export default function BusinessContext() {
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [isInitializing, setIsInitializing] = useState(true);
+  const [isDeleting, setIsDeleting] = useState<Id<"businessContexts"> | null>(null);
   
   // Safely try to fetch connection status
   const connectionStatus = useQuery(api.openai.testConnection);
@@ -96,7 +157,7 @@ export default function BusinessContext() {
         "from-purple-500 to-indigo-500",
         "from-blue-500 to-cyan-500",
         "from-emerald-500 to-teal-500",
-        "from-orange-500 to-amber-500",
+        "from-orange-500 to-amber-500", 
         "from-pink-500 to-rose-500",
         "from-indigo-500 to-purple-500"
       ];
@@ -118,12 +179,27 @@ export default function BusinessContext() {
       return "Unknown date";
     }
   };
+  
+  // Handle delete context
+  const handleDeleteContext = async (id: Id<"businessContexts">) => {
+    if (window.confirm("Are you sure you want to delete this business context?")) {
+      setIsDeleting(id);
+      try {
+        await deleteBusinessContext({ id });
+      } catch (error) {
+        console.error("Error deleting context:", error);
+        alert("Failed to delete context");
+      } finally {
+        setIsDeleting(null);
+      }
+    }
+  };
 
   // Render the loading state
   if (isInitializing) {
     return (
       <div className="flex flex-col items-center justify-center p-12">
-        <div className="w-16 h-16 border-4 border-t-primary border-solid rounded-full animate-spin mb-4"></div>
+        <div className="w-16 h-16 border-4 border-t-primary border-r-transparent border-b-transparent border-l-transparent rounded-full animate-spin mb-4"></div>
         <p className="text-gray-400">Loading business contexts...</p>
         {connectionStatus === undefined && (
           <p className="text-yellow-400 mt-4">Connecting to database...</p>
@@ -135,7 +211,7 @@ export default function BusinessContext() {
   // Render error state if we have an error
   if (error) {
     return (
-      <div className="glass-card p-8 text-center">
+      <GlassCard className="p-8 text-center">
         <svg 
           className="w-16 h-16 mx-auto text-red-500 mb-4" 
           fill="none" 
@@ -154,62 +230,36 @@ export default function BusinessContext() {
         <p className="text-gray-400 mb-6">
           {error}
         </p>
-        <button 
+        <Button 
           onClick={() => window.location.reload()}
-          className="btn-primary"
         >
           Refresh Page
-        </button>
-      </div>
+        </Button>
+      </GlassCard>
     );
   }
 
-  // If contexts is undefined or null, show an empty state but not a blank page
-  if (!contexts) {
+  // If contexts is undefined or null, show a loading state
+  if (contexts === undefined) {
     return (
-      <div className="glass-card p-8 text-center">
-        <svg
-          className="w-16 h-16 mx-auto text-gray-600 mb-4"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={1.5}
-            d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
-          />
-        </svg>
-        <h3 className="text-xl font-medium mb-2 gradient-text">No data available</h3>
-        <p className="text-gray-400 mb-6">
-          We're having trouble loading your business contexts. You can create a new one or try refreshing.
-        </p>
-        <div className="flex flex-col sm:flex-row justify-center gap-4">
-          <button 
-            onClick={() => window.location.reload()}
-            className="btn-secondary"
-          >
-            Refresh Page
-          </button>
-          <Link to="/business-context/create" className="btn-primary flex items-center justify-center">
-            <svg
-              className="w-5 h-5 mr-2"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-              />
-            </svg>
-            Create New Context
-          </Link>
+      <div className="space-y-6">
+        <GlassCard>
+          <GlassCardHeader className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+              <h2 className="text-2xl font-bold gradient-text mb-2">Business Contexts</h2>
+              <p className="text-gray-400">Loading your business contexts...</p>
+            </div>
+            <div className="flex space-x-4">
+              <Skeleton className="w-48 h-10 rounded-lg" />
+              <Skeleton className="w-32 h-10 rounded-lg" />
+            </div>
+          </GlassCardHeader>
+        </GlassCard>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <SkeletonCard />
+          <SkeletonCard />
+          <SkeletonCard />
         </div>
       </div>
     );
@@ -220,8 +270,8 @@ export default function BusinessContext() {
     return (
       <div className="space-y-8">
         {/* Header Section */}
-        <div className="glass-card p-6 backdrop-blur-sm">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+        <GlassCard>
+          <GlassCardHeader className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
               <h2 className="text-2xl font-bold gradient-text mb-2">Business Contexts</h2>
               <p className="text-gray-400">
@@ -230,226 +280,125 @@ export default function BusinessContext() {
             </div>
             <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto">
               <div className="relative w-full sm:w-64">
-                <input
+                <Input
                   type="text"
                   placeholder="Search contexts..."
-                  className="w-full backdrop-blur-sm bg-slate-800/50 border border-slate-700 rounded-lg px-4 py-2 pl-10 focus:outline-none focus:ring-2 focus:ring-primary text-white"
+                  className="w-full pl-10"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
+                  leftIcon={<SearchIcon />}
                 />
-                <svg
-                  className="absolute left-3 top-2.5 h-5 w-5 text-gray-400"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                  />
-                </svg>
               </div>
-              <Link to="/business-context/create" className="btn-primary whitespace-nowrap flex items-center justify-center">
-                <svg
-                  className="w-5 h-5 mr-2"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  xmlns="http://www.w3.org/2000/svg"
+              <Link to="/business-context/create">
+                <Button
+                  leftIcon={<PlusIcon />}
+                  className="w-full sm:w-auto whitespace-nowrap"
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-                  />
-                </svg>
-                New Context
+                  New Context
+                </Button>
               </Link>
             </div>
-          </div>
-        </div>
+          </GlassCardHeader>
+        </GlassCard>
 
         {/* Content Section */}
         <div className="min-h-[300px]">
           {filteredContexts && filteredContexts.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredContexts.map((context: BusinessContext) => (
-                <div 
+                <GlassCard 
                   key={context._id} 
-                  className="glass-card p-0 transition-all duration-200 hover:translate-y-[-2px] overflow-hidden group"
+                  variant="gradient"
+                  className="flex flex-col h-full overflow-hidden group transition-transform duration-300 hover:translate-y-[-4px]"
                 >
                   <div className={`h-1.5 w-full bg-gradient-to-r ${generateColor(context.title)}`}></div>
-                  <div className="p-6">
-                    <div className="flex justify-between items-start mb-4">
-                      <h3 className="text-xl font-semibold text-white truncate flex-1 group-hover:text-primary transition-colors">
+                  <GlassCardHeader className="pb-2">
+                    <div className="flex justify-between items-start">
+                      <h3 className="text-xl font-semibold text-white group-hover:text-primary transition-colors duration-300 truncate flex-1">
                         {context.title}
                       </h3>
-                      <div className="flex space-x-2 opacity-70 group-hover:opacity-100">
+                      <div className="flex space-x-1 opacity-70 group-hover:opacity-100 transition-opacity duration-300">
                         <Link
                           to={`/business-context/edit/${context._id}`}
                           className="p-1.5 rounded hover:bg-slate-700/50 transition-colors"
                           title="Edit"
                         >
-                          <svg
-                            className="w-4 h-4 text-gray-400 hover:text-white"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                            xmlns="http://www.w3.org/2000/svg"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                            />
-                          </svg>
+                          <EditIcon />
                         </Link>
-                        {deleteBusinessContext && (
-                          <button
-                            onClick={() => {
-                              if (window.confirm("Are you sure you want to delete this business context?")) {
-                                deleteBusinessContext({ id: context._id });
-                              }
-                            }}
-                            className="p-1.5 rounded hover:bg-slate-700/50 transition-colors"
-                            title="Delete"
-                          >
-                            <svg
-                              className="w-4 h-4 text-gray-400 hover:text-red-400"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                              xmlns="http://www.w3.org/2000/svg"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                              />
-                            </svg>
-                          </button>
-                        )}
+                        <IconButton
+                          icon={<DeleteIcon />}
+                          variant="ghost"
+                          aria-label="Delete"
+                          className="text-gray-400 hover:text-red-400"
+                          onClick={() => handleDeleteContext(context._id)}
+                          disabled={isDeleting === context._id}
+                        />
                       </div>
                     </div>
                     
-                    <div className="mt-2 mb-4">
+                    <div className="mt-2 mb-2">
                       <p className="text-gray-400 line-clamp-3 text-sm">
                         {context.description}
                       </p>
                     </div>
-                    
-                    <div className="mt-4 pt-4 border-t border-gray-800 flex justify-between items-center">
-                      <span className="text-xs text-gray-500 flex items-center">
-                        <svg 
-                          className="w-3.5 h-3.5 mr-1 text-gray-500" 
-                          fill="none" 
-                          stroke="currentColor" 
-                          viewBox="0 0 24 24" 
-                          xmlns="http://www.w3.org/2000/svg"
-                        >
-                          <path 
-                            strokeLinecap="round" 
-                            strokeLinejoin="round" 
-                            strokeWidth={2} 
-                            d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" 
-                          />
-                        </svg>
+                  </GlassCardHeader>
+                  
+                  <GlassCardFooter bordered className="mt-auto justify-between">
+                    <span className="text-xs text-gray-500 flex items-center">
+                      <CalendarIcon /> 
+                      <span className="ml-1.5">
                         {formatDate(context.updatedAt)}
                       </span>
-                      <Link
-                        to={`/business-context/view/${context._id}`}
-                        className="text-primary hover:text-primary/80 flex items-center text-sm font-medium transition-colors"
-                      >
-                        View Details
-                        <svg
-                          className="w-4 h-4 ml-1"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                          xmlns="http://www.w3.org/2000/svg"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M14 5l7 7m0 0l-7 7m7-7H3"
-                          />
-                        </svg>
-                      </Link>
-                    </div>
-                  </div>
-                </div>
+                    </span>
+                    <Link
+                      to={`/business-context/view/${context._id}`}
+                      className="text-primary hover:text-primary/80 flex items-center text-sm font-medium transition-colors"
+                    >
+                      View Details
+                      <ArrowRightIcon className="ml-1.5" />
+                    </Link>
+                  </GlassCardFooter>
+                </GlassCard>
               ))}
             </div>
           ) : (
-            <div className="glass-card p-12 text-center">
+            <GlassCard className="p-12 text-center">
               {searchQuery ? (
                 <div className="max-w-md mx-auto">
-                  <svg
-                    className="w-16 h-16 mx-auto text-gray-600 mb-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={1.5}
-                      d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                    />
-                  </svg>
+                  <SearchResultIcon className="mx-auto text-gray-600 mb-4" />
                   <h3 className="text-xl font-medium mb-2 gradient-text">No matching contexts found</h3>
                   <p className="text-gray-400 mb-6">
                     Try adjusting your search query or create a new business context.
                   </p>
+                  <div className="flex justify-center gap-3">
+                    <Button
+                      variant="secondary"
+                      onClick={() => setSearchQuery("")}
+                    >
+                      Clear Search
+                    </Button>
+                    <Link to="/business-context/create">
+                      <Button>
+                        Create New
+                      </Button>
+                    </Link>
+                  </div>
                 </div>
               ) : (
                 <div className="max-w-md mx-auto">
-                  <svg
-                    className="w-16 h-16 mx-auto text-gray-600 mb-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={1.5}
-                      d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
-                    />
-                  </svg>
+                  <EmptyDocIcon className="mx-auto text-gray-600 mb-4" />
                   <h3 className="text-xl font-medium mb-2 gradient-text">No business contexts yet</h3>
                   <p className="text-gray-400 mb-6">
                     Create your first business context to get started.
                   </p>
-                  <Link to="/business-context/create" className="btn-primary inline-flex items-center">
-                    <svg
-                      className="w-5 h-5 mr-2"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                      xmlns="http://www.w3.org/2000/svg"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-                      />
-                    </svg>
-                    Create New Context
+                  <Link to="/business-context/create">
+                    <Button leftIcon={<PlusIcon />}>
+                      Create New Context
+                    </Button>
                   </Link>
                 </div>
               )}
-            </div>
+            </GlassCard>
           )}
         </div>
       </div>
@@ -458,18 +407,17 @@ export default function BusinessContext() {
     // Final fallback UI in case of rendering errors
     console.error("Error rendering BusinessContext component:", renderError);
     return (
-      <div className="glass-card p-8 text-center">
+      <GlassCard className="p-8 text-center">
         <h3 className="text-xl font-medium mb-4 text-white">Error Displaying Page</h3>
         <p className="text-gray-400 mb-6">
           There was an error displaying the business contexts page. Please try refreshing.
         </p>
-        <button 
+        <Button 
           onClick={() => window.location.reload()}
-          className="btn-primary"
         >
           Refresh Page
-        </button>
-      </div>
+        </Button>
+      </GlassCard>
     );
   }
 } 

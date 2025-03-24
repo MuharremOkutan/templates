@@ -8,7 +8,7 @@ interface AITesterProps {
   onSaveResponse?: (response: string) => void;
 }
 
-export default function AITester({ initialPrompt = '', onClose, onSaveResponse }: AITesterProps) {
+export function AITester({ initialPrompt = '', onClose, onSaveResponse }: AITesterProps) {
   const [prompt, setPrompt] = useState(initialPrompt);
   const [apiKey, setApiKey] = useState('');
   const [model, setModel] = useState('gpt-3.5-turbo');
