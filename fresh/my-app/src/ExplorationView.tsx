@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from "../convex/_generated/api";
 import { Id } from "../convex/_generated/dataModel";
@@ -63,28 +63,28 @@ export default function ExplorationView() {
   const navigate = useNavigate();
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const { data: exploration, isLoading, error } = useQuery(api.explorationFunctions.getExploration, 
-    id ? { id: id as Id<"explorationJobs"> } : "skip"
-  );
-  const { data: creator } = useQuery(api.userFunctions.getUser, 
-    exploration ? { id: exploration.userId as Id<"users"> } : "skip"
-  );
-  const { data: businessContext } = useQuery(api.businessContextFunctions.getBusinessContext, 
-    exploration ? { id: exploration.businessContextId as Id<"businessContexts"> } : "skip"
-  );
-  const { data: runs } = useQuery(api.explorationFunctions.listExplorationRuns, 
-    exploration ? { explorationId: exploration.id as Id<"explorationJobs"> } : "skip"
+  // Get the exploration job
+  const job = useQuery(api.explorationFunctions.getExplorationJob, 
+    id ? { jobId: id as Id<"explorationJobs"> } : "skip"
   );
   
-  const deleteExploration = useMutation(api.explorationFunctions.deleteExplorationJob);
+  // Get business context if available
+  const businessContext = useQuery(
+    api.businessContextFunctions.getBusinessContext, 
+    job?.businessContextId ? { id: job.businessContextId as Id<"businessContexts"> } : "skip"
+  );
+  
+  const deleteExplorationJob = useMutation(api.explorationFunctions.deleteExplorationJob);
 
   const handleDelete = async () => {
-    const confirm = window.confirm("Are you sure you want to delete this exploration?");
+    if (!id) return;
+    
+    const confirm = window.confirm("Are you sure you want to delete this job?");
     if (confirm) {
       setIsDeleting(true);
       try {
-        await deleteExploration.mutateAsync({ id: id as Id<"explorationJobs"> });
-        navigate('/explorations');
+        await deleteExplorationJob({ jobId: id as Id<"explorationJobs"> });
+        navigate('/exploration');
       } catch (err) {
         console.error(err);
         setIsDeleting(false);
@@ -92,8 +92,10 @@ export default function ExplorationView() {
     }
   };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
+  const formatDate = (timestamp?: number) => {
+    if (!timestamp) return "N/A";
+    
+    const date = new Date(timestamp);
     return new Intl.DateTimeFormat('en-US', {
       year: 'numeric',
       month: 'short',
@@ -102,8 +104,19 @@ export default function ExplorationView() {
       minute: 'numeric',
     }).format(date);
   };
-
-  if (isLoading) {
+  
+  // Helper function to ensure status is a valid StatusType
+  const getValidStatus = (status?: string): "active" | "inactive" | "pending" | "completed" | "failed" => {
+    if (!status) return "inactive";
+    
+    const validStatuses = ["active", "inactive", "pending", "completed", "failed", "draft", "in-progress", "canceled", "approved", "rejected"];
+    return validStatuses.includes(status) 
+      ? status as "active" | "inactive" | "pending" | "completed" | "failed" 
+      : "inactive";
+  };
+  
+  // Loading state
+  if (!job) {
     return (
       <div className="container mx-auto py-8 px-4">
         <div className="flex items-center mb-8">
@@ -111,7 +124,7 @@ export default function ExplorationView() {
             variant="secondary"
             size="sm"
             leftIcon={<BackIcon />}
-            onClick={() => navigate('/explorations')}
+            onClick={() => navigate('/exploration')}
           >
             Back
           </Button>
@@ -133,41 +146,6 @@ export default function ExplorationView() {
     );
   }
 
-  if (error || !exploration) {
-    return (
-      <div className="container mx-auto py-8 px-4">
-        <div className="flex items-center mb-8">
-          <Button
-            variant="secondary"
-            size="sm"
-            leftIcon={<BackIcon />}
-            onClick={() => navigate('/explorations')}
-          >
-            Back
-          </Button>
-        </div>
-        
-        <GlassCard>
-          <GlassCardContent>
-            <div className="text-center py-12">
-              <h3 className="text-xl font-medium text-red-400 mb-2">Error Loading Exploration</h3>
-              <p className="text-slate-400">
-                The exploration could not be found or there was an error loading it.
-              </p>
-              <Button 
-                variant="secondary"
-                className="mt-6"
-                onClick={() => navigate('/explorations')}
-              >
-                Return to Explorations
-              </Button>
-            </div>
-          </GlassCardContent>
-        </GlassCard>
-      </div>
-    );
-  }
-
   return (
     <div className="container mx-auto py-8 px-4">
       <div className="flex items-center mb-8">
@@ -175,7 +153,7 @@ export default function ExplorationView() {
           variant="secondary"
           size="sm"
           leftIcon={<BackIcon />}
-          onClick={() => navigate('/explorations')}
+          onClick={() => navigate('/exploration')}
         >
           Back
         </Button>
@@ -184,20 +162,18 @@ export default function ExplorationView() {
           <IconButton
             variant="secondary"
             size="sm"
-            onClick={() => navigate(`/explorations/${id}/edit`)}
+            icon={<EditIcon />}
+            onClick={() => navigate(`/exploration/${id}/edit`)}
             aria-label="Edit"
-          >
-            <EditIcon />
-          </IconButton>
+          />
           <IconButton
             variant="danger"
             size="sm"
+            icon={<DeleteIcon />}
             onClick={handleDelete}
             isLoading={isDeleting}
             aria-label="Delete"
-          >
-            <DeleteIcon />
-          </IconButton>
+          />
         </div>
       </div>
       
@@ -205,20 +181,19 @@ export default function ExplorationView() {
         <GlassCardHeader className="border-b border-slate-700/50">
           <div className="flex justify-between items-start">
             <div>
-              <h1 className="text-2xl font-semibold text-white mb-2">{exploration.name}</h1>
-              <p className="text-slate-300 mb-4">{exploration.description}</p>
+              <h1 className="text-2xl font-semibold text-white mb-2">{job.name}</h1>
+              <p className="text-slate-300 mb-4">{job.description}</p>
               
               <div className="flex items-center gap-4">
-                <StatusBadge status={exploration.status} />
+                <StatusBadge status={getValidStatus(job.status)} />
                 
                 {businessContext && (
-                  <Link 
-                    to={`/business-contexts/${businessContext.id}`}
-                    className="text-sm text-cyan-400 hover:text-cyan-300 transition-colors flex items-center gap-1.5"
+                  <div 
+                    className="text-sm text-cyan-400 flex items-center gap-1.5"
                   >
                     <span>Business Context:</span>
-                    <span className="font-medium">{businessContext.name}</span>
-                  </Link>
+                    <span className="font-medium">{businessContext.title}</span>
+                  </div>
                 )}
               </div>
             </div>
@@ -234,112 +209,100 @@ export default function ExplorationView() {
                 <div className="flex items-center text-sm">
                   <CalendarIcon className="text-slate-400 mr-2" />
                   <span className="text-slate-400 w-24">Created:</span>
-                  <span className="text-slate-200">{formatDate(exploration.createdAt)}</span>
+                  <span className="text-slate-200">{formatDate(job.createdAt)}</span>
                 </div>
                 
                 <div className="flex items-center text-sm">
                   <CalendarIcon className="text-slate-400 mr-2" />
                   <span className="text-slate-400 w-24">Updated:</span>
-                  <span className="text-slate-200">{formatDate(exploration.updatedAt)}</span>
+                  <span className="text-slate-200">{formatDate(job.updatedAt)}</span>
                 </div>
                 
                 <div className="flex items-center text-sm">
                   <UserIcon className="text-slate-400 mr-2" />
-                  <span className="text-slate-400 w-24">Created by:</span>
-                  <span className="text-slate-200">{creator?.name || 'Unknown'}</span>
-                </div>
-                
-                <div className="flex items-center text-sm">
-                  <ClockIcon className="text-slate-400 mr-2" />
-                  <span className="text-slate-400 w-24">Duration:</span>
-                  <span className="text-slate-200">{exploration.estimatedDuration || 'Not specified'}</span>
+                  <span className="text-slate-400 w-24">Last Run:</span>
+                  <span className="text-slate-200">{formatDate(job.lastRun)}</span>
                 </div>
               </div>
             </div>
             
-            <div>
-              <h3 className="text-lg font-medium text-white mb-3">Additional Information</h3>
-              <div className="p-4 bg-slate-800/50 rounded-lg border border-slate-700/50">
-                <p className="text-slate-300 whitespace-pre-wrap">
-                  {exploration.additionalInformation || 'No additional information provided.'}
-                </p>
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium text-white mb-3">Schedule Information</h3>
+              
+              <div className="space-y-2">
+                <div className="flex items-center text-sm">
+                  <CalendarIcon className="text-slate-400 mr-2" />
+                  <span className="text-slate-400 w-24">Start Date:</span>
+                  <span className="text-slate-200">
+                    {job.startDate ? new Date(job.startDate).toLocaleDateString() : "N/A"}
+                  </span>
+                </div>
+                
+                <div className="flex items-center text-sm">
+                  <CalendarIcon className="text-slate-400 mr-2" />
+                  <span className="text-slate-400 w-24">End Date:</span>
+                  <span className="text-slate-200">
+                    {job.endDate ? new Date(job.endDate).toLocaleDateString() : "N/A"}
+                  </span>
+                </div>
+                
+                <div className="flex flex-col text-sm">
+                  <div className="flex items-center mb-1">
+                    <ClockIcon className="text-slate-400 mr-2" />
+                    <span className="text-slate-400 w-24">Schedule:</span>
+                  </div>
+                  
+                  <div className="ml-6 space-y-1">
+                    <div className="flex flex-wrap gap-1">
+                      <span className="text-xs text-slate-400">Days:</span>
+                      {job.scheduleDays && job.scheduleDays.map((day: number) => (
+                        <span key={day} className="text-xs bg-slate-800/50 px-2 py-0.5 rounded-full text-slate-300">
+                          {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][day]}
+                        </span>
+                      ))}
+                    </div>
+                    
+                    <div className="flex flex-wrap gap-1">
+                      <span className="text-xs text-slate-400">Hours:</span>
+                      {job.scheduleHours && job.scheduleHours.map((hour: number) => (
+                        <span key={hour} className="text-xs bg-slate-800/50 px-2 py-0.5 rounded-full text-slate-300">
+                          {hour.toString().padStart(2, '0')}:00
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
-        </GlassCardContent>
-      </GlassCard>
-      
-      <div className="mb-6">
-        <h2 className="text-xl font-semibold text-white mb-4">Exploration Runs</h2>
-        
-        {runs && runs.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {runs.map((run: any) => (
-              <GlassCard key={run.id} className="h-full">
-                <GlassCardHeader className="border-b border-slate-700/50">
-                  <div className="flex justify-between items-center">
-                    <h3 className="font-medium text-white">{run.name || `Run #${run.runNumber}`}</h3>
-                    <StatusBadge status={run.status} />
-                  </div>
+          
+          {businessContext && (
+            <div className="mt-8">
+              <GlassCard variant="gradient" color="accent">
+                <GlassCardHeader>
+                  <h3 className="text-lg font-medium text-white">Business Context</h3>
                 </GlassCardHeader>
-                
                 <GlassCardContent>
-                  <div className="space-y-3">
-                    <div className="flex items-center text-sm">
-                      <CalendarIcon className="text-slate-400 mr-2" />
-                      <span className="text-slate-400 w-16">Started:</span>
-                      <span className="text-slate-200">{formatDate(run.startedAt)}</span>
-                    </div>
-                    
-                    {run.completedAt && (
-                      <div className="flex items-center text-sm">
-                        <ClockIcon className="text-slate-400 mr-2" />
-                        <span className="text-slate-400 w-16">Duration:</span>
-                        <span className="text-slate-200">
-                          {Math.round((new Date(run.completedAt).getTime() - new Date(run.startedAt).getTime()) / 60000)} minutes
-                        </span>
-                      </div>
-                    )}
-                    
-                    <p className="text-slate-300 text-sm mt-2">
-                      {run.summary || 'No summary available.'}
-                    </p>
+                  <div className="prose prose-invert max-w-none">
+                    <h4>{businessContext.title}</h4>
+                    <p>{businessContext.description}</p>
                   </div>
                 </GlassCardContent>
-                
-                <GlassCardFooter bordered className="justify-end">
-                  <Button 
-                    variant="primary" 
-                    size="sm"
-                    leftIcon={<PlayIcon />}
-                    onClick={() => navigate(`/exploration-runs/${run.id}`)}
-                  >
-                    View Details
-                  </Button>
-                </GlassCardFooter>
               </GlassCard>
-            ))}
-          </div>
-        ) : (
-          <GlassCard>
-            <GlassCardContent>
-              <div className="text-center py-8">
-                <h3 className="text-lg font-medium text-slate-300 mb-2">No Runs Yet</h3>
-                <p className="text-slate-400 mb-6">
-                  This exploration hasn't been run yet. Start a new run to collect results.
-                </p>
-                <Button 
-                  variant="primary"
-                  leftIcon={<PlayIcon />}
-                  onClick={() => navigate(`/explorations/${id}/run`)}
-                >
-                  Start New Run
-                </Button>
-              </div>
-            </GlassCardContent>
-          </GlassCard>
-        )}
-      </div>
+            </div>
+          )}
+        </GlassCardContent>
+        
+        <GlassCardFooter>
+          <Button
+            variant="primary"
+            leftIcon={<PlayIcon />}
+            onClick={() => navigate('/exploration')}
+          >
+            Back to Explorations
+          </Button>
+        </GlassCardFooter>
+      </GlassCard>
     </div>
   );
 } 

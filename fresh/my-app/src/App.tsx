@@ -81,7 +81,7 @@ export default function App() {
         <header className="glass-header shadow-md sticky top-0 z-10">
           <div className="container mx-auto px-4 py-4 flex justify-between items-center">
             <div className="flex items-center space-x-8">
-              <h1 className="text-2xl font-bold gradient-text">Prompt Studio</h1>
+              <h1 className="text-2xl font-bold gradient-text">Whitespace AI</h1>
               <nav className="hidden md:flex space-x-6">
                 <Link
                   to="/"
@@ -344,7 +344,7 @@ export default function App() {
             } />
             <Route path="/" element={
               <>
-                <h1 className="text-3xl font-bold text-center mb-2 gradient-text">Prompt Studio</h1>
+                <h1 className="text-3xl font-bold text-center mb-2 gradient-text">Whitespace AI</h1>
                 <p className="text-center text-gray-400 mb-8">Create, organize, and share your AI prompts</p>
                 <Authenticated>
                   <Content />
@@ -372,7 +372,7 @@ export default function App() {
         <footer className="py-6 mt-auto">
           <div className="container mx-auto px-4 text-center">
             <p className="text-gray-400 text-sm">
-              &copy; {new Date().getFullYear()} Prompt Studio. All rights reserved.
+              &copy; {new Date().getFullYear()} Whitespace AI. All rights reserved.
             </p>
           </div>
         </footer>

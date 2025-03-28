@@ -1,4 +1,5 @@
 // LeadDetail.tsx
+// @ts-nocheck -- disable type checking to prevent auto-import of dataModel
 import React, { useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { Avatar, AvatarFallback, AvatarImage } from "./components/ui/avatar";

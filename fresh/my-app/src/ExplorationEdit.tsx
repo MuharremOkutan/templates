@@ -36,21 +36,25 @@ export default function ExplorationEdit() {
   const isEditMode = Boolean(id);
   
   // Fetch data
-  const { data: exploration, isLoading, error } = useQuery(
-    api.explorationFunctions.getExploration,
-    isEditMode ? { id: id as Id<"explorationJobs"> } : "skip"
+  const job = useQuery(
+    api.explorationFunctions.getExplorationJob,
+    isEditMode ? { jobId: id as Id<"explorationJobs"> } : "skip"
   );
-  const { data: businessContexts } = useQuery(api.businessContextFunctions.listBusinessContexts);
+  const businessContexts = useQuery(api.businessContextFunctions.listBusinessContexts);
+  const collections = useQuery(api.promptFunctions.listCollections);
+  
+  const isLoading = !collections || (isEditMode && !job);
   
   // Form state
   const [formState, setFormState] = useState({
     name: '',
     description: '',
-    status: 'draft',
     businessContextId: '',
+    collectionId: '',
     startDate: new Date(),
-    estimatedDuration: '',
-    additionalInformation: '',
+    endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days from now
+    scheduleDays: [0, 1, 2, 3, 4, 5, 6], // All days by default
+    scheduleHours: [9], // 9 AM by default
   });
   
   const [isSaving, setIsSaving] = useState(false);
@@ -58,22 +62,26 @@ export default function ExplorationEdit() {
   
   // Load exploration data when available
   useEffect(() => {
-    if (exploration) {
+    if (job && isEditMode) {
+      const startDate = job.startDate ? new Date(job.startDate) : new Date();
+      const endDate = job.endDate ? new Date(job.endDate) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      
       setFormState({
-        name: exploration.name || '',
-        description: exploration.description || '',
-        status: exploration.status || 'draft',
-        businessContextId: exploration.businessContextId || '',
-        startDate: exploration.startDate ? new Date(exploration.startDate) : new Date(),
-        estimatedDuration: exploration.estimatedDuration || '',
-        additionalInformation: exploration.additionalInformation || '',
+        name: job.name || '',
+        description: job.description || '',
+        businessContextId: job.businessContextId || '',
+        collectionId: job.collectionId || '',
+        startDate,
+        endDate,
+        scheduleDays: job.scheduleDays || [0, 1, 2, 3, 4, 5, 6],
+        scheduleHours: job.scheduleHours || [9],
       });
     }
-  }, [exploration]);
+  }, [job, isEditMode]);
   
   // API mutations
-  const createExploration = useMutation(api.explorationFunctions.createExplorationJob);
-  const updateExploration = useMutation(api.explorationFunctions.updateExplorationJob);
+  const createExplorationJob = useMutation(api.explorationFunctions.createExplorationJob);
+  const updateExplorationJob = useMutation(api.explorationFunctions.updateExplorationJob);
   
   // Form handlers
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -90,16 +98,18 @@ export default function ExplorationEdit() {
     }
   };
   
-  const handleDateChange = (date: Date) => {
-    setFormState(prev => ({ ...prev, startDate: date }));
-    
-    // Clear error when field is edited
-    if (formErrors.startDate) {
-      setFormErrors(prev => {
-        const newErrors = { ...prev };
-        delete newErrors.startDate;
-        return newErrors;
-      });
+  const handleDateChange = (field: string, date: Date | null) => {
+    if (date) {
+      setFormState(prev => ({ ...prev, [field]: date }));
+      
+      // Clear error when field is edited
+      if (formErrors[field]) {
+        setFormErrors(prev => {
+          const newErrors = { ...prev };
+          delete newErrors[field];
+          return newErrors;
+        });
+      }
     }
   };
   
@@ -118,6 +128,10 @@ export default function ExplorationEdit() {
       errors.businessContextId = 'Business context is required';
     }
     
+    if (!formState.collectionId) {
+      errors.collectionId = 'Collection is required';
+    }
+    
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -133,25 +147,27 @@ export default function ExplorationEdit() {
     
     try {
       if (isEditMode && id) {
-        await updateExploration({
+        await updateExplorationJob({
           jobId: id as Id<"explorationJobs">,
           name: formState.name,
           description: formState.description,
-          status: formState.status,
-          businessContextId: formState.businessContextId as Id<"businessContexts">,
+          businessContextId: formState.businessContextId as Id<"businessContexts"> || undefined,
+          collectionId: formState.collectionId as Id<"collections"> || undefined,
           startDate: formState.startDate.toISOString(),
-          estimatedDuration: formState.estimatedDuration,
-          additionalInformation: formState.additionalInformation
+          endDate: formState.endDate.toISOString(),
+          scheduleDays: formState.scheduleDays,
+          scheduleHours: formState.scheduleHours
         });
       } else {
-        await createExploration({
+        await createExplorationJob({
           name: formState.name,
           description: formState.description,
-          status: formState.status,
-          businessContextId: formState.businessContextId as Id<"businessContexts">,
+          businessContextId: formState.businessContextId as Id<"businessContexts"> || undefined,
+          collectionId: formState.collectionId as Id<"collections"> || undefined,
           startDate: formState.startDate.toISOString(),
-          estimatedDuration: formState.estimatedDuration,
-          additionalInformation: formState.additionalInformation
+          endDate: formState.endDate.toISOString(),
+          scheduleDays: formState.scheduleDays,
+          scheduleHours: formState.scheduleHours
         });
       }
       
@@ -162,7 +178,7 @@ export default function ExplorationEdit() {
     }
   };
   
-  if (isEditMode && isLoading) {
+  if (isLoading) {
     return (
       <div className="container mx-auto py-8 px-4">
         <div className="flex items-center mb-8">
@@ -193,7 +209,7 @@ export default function ExplorationEdit() {
     );
   }
   
-  if (isEditMode && (error || !exploration)) {
+  if (isEditMode && !job) {
     return (
       <div className="container mx-auto py-8 px-4">
         <div className="flex items-center mb-8">
@@ -255,72 +271,79 @@ export default function ExplorationEdit() {
           
           <GlassCardContent>
             <div className="space-y-6">
-              <div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <Input
                   label="Name"
                   name="name"
                   value={formState.name}
                   onChange={handleInputChange}
-                  error={formErrors.name}
                   placeholder="Enter exploration name"
+                  error={formErrors.name}
+                  required
                 />
-              </div>
-              
-              <div>
-                <Textarea
-                  label="Description"
-                  name="description"
-                  value={formState.description}
-                  onChange={handleInputChange}
-                  error={formErrors.description}
-                  placeholder="Enter a detailed description of this exploration"
-                  rows={4}
-                />
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                
                 <div>
                   <label className="block text-sm font-medium text-slate-300 mb-1">
-                    Business Context
+                    Collection
                   </label>
                   <select
-                    name="businessContextId"
-                    value={formState.businessContextId}
+                    name="collectionId"
+                    value={formState.collectionId}
                     onChange={handleInputChange}
                     className={`w-full bg-slate-800/50 border ${
-                      formErrors.businessContextId 
+                      formErrors.collectionId 
                         ? 'border-red-500/50 focus:border-red-500' 
                         : 'border-slate-700 focus:border-primary'
                     } rounded-md px-3 py-2 text-slate-200 focus:outline-none focus:ring-1 focus:ring-primary`}
                   >
-                    <option value="">Select a business context</option>
-                    {businessContexts?.map((context: any) => (
-                      <option key={context.id} value={context.id}>
-                        {context.name}
+                    <option value="">Select a collection</option>
+                    {collections?.map((collection: any) => (
+                      <option key={collection._id} value={collection._id}>
+                        {collection.name}
                       </option>
                     ))}
                   </select>
-                  {formErrors.businessContextId && (
-                    <p className="text-red-400 text-xs mt-1">{formErrors.businessContextId}</p>
+                  {formErrors.collectionId && (
+                    <p className="text-red-400 text-xs mt-1">{formErrors.collectionId}</p>
                   )}
                 </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-1">
-                    Status
-                  </label>
-                  <select
-                    name="status"
-                    value={formState.status}
-                    onChange={handleInputChange}
-                    className="w-full bg-slate-800/50 border border-slate-700 rounded-md px-3 py-2 text-slate-200 focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
-                  >
-                    <option value="draft">Draft</option>
-                    <option value="in-progress">In Progress</option>
-                    <option value="completed">Completed</option>
-                    <option value="canceled">Canceled</option>
-                  </select>
-                </div>
+              </div>
+              
+              <Textarea
+                label="Description"
+                name="description"
+                value={formState.description}
+                onChange={handleInputChange}
+                placeholder="Enter a description for this exploration"
+                rows={4}
+                error={formErrors.description}
+                required
+              />
+              
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-1">
+                  Business Context
+                </label>
+                <select
+                  name="businessContextId"
+                  value={formState.businessContextId}
+                  onChange={handleInputChange}
+                  className={`w-full bg-slate-800/50 border ${
+                    formErrors.businessContextId 
+                      ? 'border-red-500/50 focus:border-red-500' 
+                      : 'border-slate-700 focus:border-primary'
+                  } rounded-md px-3 py-2 text-slate-200 focus:outline-none focus:ring-1 focus:ring-primary`}
+                >
+                  <option value="">Select a business context</option>
+                  {businessContexts?.map((context: any) => (
+                    <option key={context._id} value={context._id}>
+                      {context.title}
+                    </option>
+                  ))}
+                </select>
+                {formErrors.businessContextId && (
+                  <p className="text-red-400 text-xs mt-1">{formErrors.businessContextId}</p>
+                )}
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -330,32 +353,79 @@ export default function ExplorationEdit() {
                   </label>
                   <DatePicker
                     selected={formState.startDate}
-                    onChange={handleDateChange}
+                    onChange={(date) => handleDateChange('startDate', date)}
                     className="w-full bg-slate-800/50 border border-slate-700 rounded-md px-3 py-2 text-slate-200 focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
                     dateFormat="MMMM d, yyyy"
                   />
                 </div>
                 
                 <div>
-                  <Input
-                    label="Estimated Duration"
-                    name="estimatedDuration"
-                    value={formState.estimatedDuration}
-                    onChange={handleInputChange}
-                    placeholder="e.g., 2 weeks, 3 days"
+                  <label className="block text-sm font-medium text-slate-300 mb-1">
+                    End Date
+                  </label>
+                  <DatePicker
+                    selected={formState.endDate}
+                    onChange={(date) => handleDateChange('endDate', date)}
+                    className="w-full bg-slate-800/50 border border-slate-700 rounded-md px-3 py-2 text-slate-200 focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
+                    dateFormat="MMMM d, yyyy"
                   />
                 </div>
               </div>
               
-              <div>
-                <Textarea
-                  label="Additional Information"
-                  name="additionalInformation"
-                  value={formState.additionalInformation}
-                  onChange={handleInputChange}
-                  placeholder="Any other relevant details about this exploration"
-                  rows={6}
-                />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-1">
+                    Schedule Days
+                  </label>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, index) => (
+                      <button
+                        key={index}
+                        type="button"
+                        className={`px-3 py-1.5 rounded-md text-sm border ${
+                          formState.scheduleDays.includes(index)
+                            ? 'bg-primary/20 border-primary/50 text-primary-foreground'
+                            : 'bg-slate-800/50 border-slate-700 text-slate-300 hover:bg-slate-700/50'
+                        }`}
+                        onClick={() => {
+                          const newDays = formState.scheduleDays.includes(index)
+                            ? formState.scheduleDays.filter(d => d !== index)
+                            : [...formState.scheduleDays, index];
+                          setFormState(prev => ({ ...prev, scheduleDays: newDays }));
+                        }}
+                      >
+                        {day}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-1">
+                    Schedule Hours
+                  </label>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {[0, 3, 6, 9, 12, 15, 18, 21].map((hour) => (
+                      <button
+                        key={hour}
+                        type="button"
+                        className={`px-3 py-1.5 rounded-md text-sm border ${
+                          formState.scheduleHours.includes(hour)
+                            ? 'bg-primary/20 border-primary/50 text-primary-foreground'
+                            : 'bg-slate-800/50 border-slate-700 text-slate-300 hover:bg-slate-700/50'
+                        }`}
+                        onClick={() => {
+                          const newHours = formState.scheduleHours.includes(hour)
+                            ? formState.scheduleHours.filter(h => h !== hour)
+                            : [...formState.scheduleHours, hour];
+                          setFormState(prev => ({ ...prev, scheduleHours: newHours }));
+                        }}
+                      >
+                        {hour}:00
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
           </GlassCardContent>
